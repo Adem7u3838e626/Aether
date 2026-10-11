@@ -697,6 +697,7 @@ private slots:
         QTest::newRow("delete") << "deleteConfirmDialog";
         QTest::newRow("empty trash") << "emptyTrashConfirmDialog";
         QTest::newRow("bulk custom action") << "customActionConfirmDialog";
+        QTest::newRow("run executable") << "runExecutableDialog";
         QTest::newRow("conflict") << "conflictDialog";
         QTest::newRow("app chooser") << "appChooserDialog";
     }
@@ -716,6 +717,31 @@ private slots:
         auto *item = root->property(dialog.toUtf8()).value<QQuickItem *>();
         QVERIFY(item);
         QTRY_VERIFY(item->isVisible());
+    }
+
+    // Activating a program asks how to run it instead of handing it to
+    // xdg-open, which only knows to open scripts in an editor (#48).
+    void testActivatingExecutableAsksToRun()
+    {
+        App app;
+        QVERIFY(app.load());
+        const QString script = app.home.path() + "/tool.sh";
+        {
+            QFile f(script);
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write("#!/bin/sh\n");
+        }
+        QFile::setPermissions(script, QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+
+        QObject *root = app.window->contentItem()->parent();
+        QVERIFY(QMetaObject::invokeMethod(root, "handlePaneFileActivated",
+                                          Q_ARG(QVariant, QStringLiteral("primary")),
+                                          Q_ARG(QVariant, script),
+                                          Q_ARG(QVariant, false)));
+        auto *dialog = root->property("runExecutableDialog").value<QQuickItem *>();
+        QVERIFY(dialog);
+        QTRY_VERIFY(dialog->isVisible());
+        QCOMPARE(root->property("runCandidatePath").toString(), script);
     }
 
     // Typing debounces the recursive search: a burst of keystrokes starts one

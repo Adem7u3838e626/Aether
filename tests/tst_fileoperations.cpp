@@ -249,6 +249,11 @@ private slots:
 
         QFile::setPermissions(prog, QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
         QVERIFY(ops.isExecutable(prog));
+        // An x bit without a shebang or ELF header (any file on a FAT/NTFS
+        // mount) is not a program.
+        QFile::setPermissions(plain, QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+        QVERIFY(!ops.isExecutable(plain));
+        QVERIFY(ops.isExecutable(QCoreApplication::applicationFilePath()));
         ops.runExecutable(prog, false);
         QTRY_VERIFY_WITH_TIMEOUT(QFile::exists(marker), 5000);
         QFile f(marker);

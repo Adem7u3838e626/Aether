@@ -35,6 +35,7 @@ ApplicationWindow {
     property var deleteConfirmPaths: []
     // A custom action waiting on the "that is a lot of processes" confirmation.
     property var pendingCustomAction: ({ name: "", command: "", paths: [] })
+    property string runCandidatePath: ""
     property var pendingCloudCallbacks: []
     property var transferConflictItems: []
     property var transferResolvedItems: []
@@ -585,6 +586,7 @@ ApplicationWindow {
             && !root.isShown(root.deleteConfirmDialog)
             && !root.isShown(root.emptyTrashConfirmDialog)
             && !root.isShown(root.customActionConfirmDialog)
+            && !root.isShown(root.runExecutableDialog)
             && !(root.quickPreview && root.quickPreview.active)
     }
 
@@ -2958,6 +2960,82 @@ ApplicationWindow {
     }
     readonly property var customActionConfirmDialog: customActionConfirmDialogLoader.item
 
+    // ── Run Executable Dialog ────────────────────────────────────────────────
+    // Activating a program asks instead of handing it to xdg-open, which has
+    // no idea how to "open" a script or binary (#48).
+    Loader {
+        id: runExecutableDialogLoader
+        objectName: "runExecutableDialogLoader"
+        anchors.fill: parent
+        z: 9998
+        active: false
+        sourceComponent: Component {
+            Q.Dialog {
+                id: runDialog
+                title: "Run \"" + root.runCandidatePath.substring(root.runCandidatePath.lastIndexOf("/") + 1) + "\"?"
+                dialogWidth: 400
+                initialFocusItem: runButton
+
+                Text {
+                    Layout.fillWidth: true
+                    textFormat: Text.PlainText
+                    text: "This file is a program. Run it, run it in a terminal, or open it with an application."
+                    color: Theme.subtext
+                    font.pointSize: Theme.fontNormal
+                    wrapMode: Text.WordWrap
+                }
+
+                RowLayout {
+                    Layout.alignment: Qt.AlignRight
+                    spacing: 12
+
+                    Q.Button {
+                        id: openButton
+                        text: "Open"
+                        variant: "ghost"
+                        size: "small"
+                        KeyNavigation.right: terminalButton
+                        KeyNavigation.tab: terminalButton
+                        KeyNavigation.backtab: runButton
+                        onClicked: {
+                            runDialog.close()
+                            fileOps.openFile(root.runCandidatePath)
+                            recentFiles.addRecent(root.runCandidatePath)
+                        }
+                    }
+                    Q.Button {
+                        id: terminalButton
+                        text: "Run in Terminal"
+                        variant: "ghost"
+                        size: "small"
+                        KeyNavigation.left: openButton
+                        KeyNavigation.right: runButton
+                        KeyNavigation.tab: runButton
+                        KeyNavigation.backtab: openButton
+                        onClicked: {
+                            runDialog.close()
+                            fileOps.runExecutable(root.runCandidatePath, true)
+                        }
+                    }
+                    Q.Button {
+                        id: runButton
+                        text: "Run"
+                        variant: "primary"
+                        size: "small"
+                        KeyNavigation.left: terminalButton
+                        KeyNavigation.tab: openButton
+                        KeyNavigation.backtab: terminalButton
+                        onClicked: {
+                            runDialog.close()
+                            fileOps.runExecutable(root.runCandidatePath, false)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    readonly property var runExecutableDialog: runExecutableDialogLoader.item
+
     // ── Empty Trash Confirmation Dialog ──────────────────────────────────────
     Loader {
         id: emptyTrashConfirmDialogLoader
@@ -3634,6 +3712,9 @@ ApplicationWindow {
 
         if (isDirectory) {
             root.navigatePaneTo(pane, filePath)
+        } else if (fileOps.isExecutable(filePath)) {
+            root.runCandidatePath = filePath
+            root.openDialog(runExecutableDialogLoader)
         } else if (fileOps.isArchive(filePath)) {
             // Into a fresh folder next to the archive: extracting into the
             // parent directory would silently replace files with the same

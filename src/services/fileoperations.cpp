@@ -2005,7 +2005,16 @@ bool FileOperations::isExecutable(const QString &path) const
     if (isUriPath(path))
         return false;
     const QFileInfo info(path);
-    return info.isFile() && info.isExecutable();
+    if (!info.isFile() || !info.isExecutable())
+        return false;
+    // The x bit alone is not enough: on FAT/NTFS mounts every file has it,
+    // and offering to "run" a photo is nonsense. Programs are ELF binaries
+    // (AppImages included) or scripts with a shebang.
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly))
+        return false;
+    const QByteArray head = file.read(4);
+    return head.startsWith("#!") || head == QByteArrayLiteral("\x7f" "ELF");
 }
 
 // Runs an executable file (binary or script with a shebang) in its own
