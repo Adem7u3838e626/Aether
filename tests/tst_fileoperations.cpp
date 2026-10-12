@@ -1547,6 +1547,10 @@ private slots:
 
         ops.pauseTransfer(id);
         QVERIFY(ops.paused());
+        // Progress is the destination's size, sampled every 250 ms, so the
+        // first samples after the pause still report what 7z wrote before it.
+        // On a fast runner that was a quarter of the archive (CI on #53).
+        QTest::qWait(600);
         const double frozen = ops.progress();
         QTest::qWait(800);
         const double later = ops.progress();
