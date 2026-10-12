@@ -15,13 +15,21 @@ on:
   pull_request:
     branches:
       - main
+  # Actions -> Build -> "Run workflow": builds and smoke-tests the AppImage
+  # and uploads it as an artifact, without publishing anything. A dry run of
+  # the release packaging, which otherwise only ever runs on a tag push.
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    # The oldest supported Ubuntu LTS. linuxdeploy bundles glib, dbus, krb5
+    # and friends from the build host, so the AppImage needs at least the
+    # host's glibc: v0.6.1, built on 24.04, required glibc 2.38 and failed
+    # the AppImage catalog's test on 22.04.
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout
@@ -135,7 +143,7 @@ jobs:
           md2html --version
 
       - name: Build QtWayland from source
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         # aqtinstall's Linux desktop Qt 6.7.3 ships the QtWayland libs
         # but omits the wayland-graphics-integration-client plugins
         # (libqt-plugin-wayland-egl.so etc.), so Qt can't find a client
@@ -183,12 +191,12 @@ jobs:
           dbus-run-session -- ctest --test-dir build --output-on-failure --parallel 4 --timeout 300
 
       - name: Install into AppDir
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         run: |
           DESTDIR="$GITHUB_WORKSPACE/AppDir" cmake --install build
 
       - name: Download linuxdeploy and Qt plugin
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         run: |
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/1-alpha-20250213-1/linuxdeploy-plugin-qt-x86_64.AppImage
@@ -201,7 +209,7 @@ jobs:
           chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage
 
       - name: Build AppImage
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         env:
           TAG_NAME: ${{ github.ref_name }}
           # Force linuxdeploy-plugin-qt to bundle the Wayland platform plugin
@@ -248,13 +256,31 @@ jobs:
             --output appimage
 
       - name: Verify bundled Wayland client integrations
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         run: |
           test -d AppDir/usr/plugins/wayland-graphics-integration-client
           test -n "$(ls -A AppDir/usr/plugins/wayland-graphics-integration-client)"
 
+      - name: Check the glibc the AppImage needs
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+        # glibc is the one library an AppImage never bundles, so the newest
+        # GLIBC_ symbol anything in AppDir asks for is the oldest system it
+        # can start on. 2.35 is Ubuntu 22.04, the oldest LTS the AppImage
+        # catalog tests on.
+        run: |
+          set -euo pipefail
+          max=$(find AppDir -type f -print0 \
+                | xargs -0 file -N -F '|' | awk -F'|' '/ ELF /{print $1}' \
+                | xargs -r objdump -T 2>/dev/null \
+                | grep -o 'GLIBC_[0-9.]*' | sort -Vu | tail -1)
+          echo "Newest glibc symbol needed: $max"
+          if [ "$(printf '%s\n' GLIBC_2.35 "$max" | sort -V | tail -1)" != GLIBC_2.35 ]; then
+            echo "::error::The AppImage needs $max, newer than Ubuntu 22.04's GLIBC_2.35"
+            exit 1
+          fi
+
       - name: Smoke-test AppImage
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         env:
           TAG_NAME: ${{ github.ref_name }}
         # Boot the freshly-built AppImage on the offscreen QPA platform and
@@ -290,7 +316,7 @@ jobs:
           echo "Smoke test passed."
 
       - name: Upload AppImage artifact
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: hyprfm-appimage
