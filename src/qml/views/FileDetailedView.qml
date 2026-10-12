@@ -292,6 +292,22 @@ FocusScope {
         event.accepted = true
     }
 
+    // single_click_opens_folders; see FileGridView for the double-click guard.
+    property double singleClickOpenedAt: 0
+
+    function singleClickOpen(path, isDir, mouse) {
+        if (!config.singleClickOpensFolders || !isDir || mouse.button !== Qt.LeftButton
+                || (mouse.modifiers & (Qt.ControlModifier | Qt.ShiftModifier)))
+            return false
+        singleClickOpenedAt = Date.now()
+        root.fileActivated(path, true)
+        return true
+    }
+
+    function inSingleClickOpenDoubleClick() {
+        return Date.now() - singleClickOpenedAt < Qt.styleHints.mouseDoubleClickInterval
+    }
+
     function activateCurrentSelection() {
         var idx = cursorIndex >= 0 ? cursorIndex : (selectedIndices.length > 0 ? selectedIndices[selectedIndices.length - 1] : -1)
         if (idx < 0)
@@ -1312,6 +1328,8 @@ FocusScope {
                                 )
                                 return
                             }
+                            if (root.singleClickOpen(detRow.filePath, detRow.isDir, mouse))
+                                return
                             root.selectIndex(
                                 detRow.index,
                                 mouse.modifiers & Qt.ControlModifier,
@@ -1320,7 +1338,7 @@ FocusScope {
                         }
 
                         onDoubleClicked: (mouse) => {
-                            if (mouse.button !== Qt.LeftButton) return
+                            if (mouse.button !== Qt.LeftButton || root.inSingleClickOpenDoubleClick()) return
                             root.fileActivated(detRow.filePath, detRow.isDir)
                         }
 
@@ -1414,7 +1432,7 @@ FocusScope {
 
                 // Double-click on empty space goes up a directory (issue #14).
                 onDoubleClicked: (mouse) => {
-                    if (mouse.button !== Qt.LeftButton) return
+                    if (mouse.button !== Qt.LeftButton || root.inSingleClickOpenDoubleClick()) return
                     var parent = root.currentPath ? fileOps.parentPath(root.currentPath) : ""
                     if (parent && parent !== root.currentPath)
                         root.fileActivated(parent, true)

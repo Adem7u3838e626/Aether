@@ -387,6 +387,25 @@ GridView {
         event.accepted = true
     }
 
+    // single_click_opens_folders: a plain left click opens a folder. A habitual
+    // double-click would land its second click in the new folder: on an item,
+    // opening it too, or on empty space, going straight back up. Double-clicks
+    // are ignored for one double-click interval after a single-click open.
+    property double singleClickOpenedAt: 0
+
+    function singleClickOpen(path, isDir, mouse) {
+        if (!config.singleClickOpensFolders || !isDir || mouse.button !== Qt.LeftButton
+                || (mouse.modifiers & (Qt.ControlModifier | Qt.ShiftModifier)))
+            return false
+        singleClickOpenedAt = Date.now()
+        root.fileActivated(path, true)
+        return true
+    }
+
+    function inSingleClickOpenDoubleClick() {
+        return Date.now() - singleClickOpenedAt < Qt.styleHints.mouseDoubleClickInterval
+    }
+
     function activateCurrentSelection() {
         var idx = cursorIndex >= 0 ? cursorIndex : (selectedIndices.length > 0 ? selectedIndices[selectedIndices.length - 1] : -1)
         if (idx < 0)
@@ -849,6 +868,8 @@ GridView {
                     )
                     return
                 }
+                if (root.singleClickOpen(delegateItem.filePath, delegateItem.isDir, mouse))
+                    return
                 root.selectIndex(
                     delegateItem.index,
                     mouse.modifiers & Qt.ControlModifier,
@@ -857,7 +878,7 @@ GridView {
             }
 
             onDoubleClicked: (mouse) => {
-                if (mouse.button !== Qt.LeftButton) return
+                if (mouse.button !== Qt.LeftButton || root.inSingleClickOpenDoubleClick()) return
                 root.fileActivated(delegateItem.filePath, delegateItem.isDir)
             }
 
@@ -959,7 +980,7 @@ GridView {
 
         // Double-click on empty space goes up a directory (issue #14).
         onDoubleClicked: (mouse) => {
-            if (mouse.button !== Qt.LeftButton) return
+            if (mouse.button !== Qt.LeftButton || root.inSingleClickOpenDoubleClick()) return
             var parent = root.currentPath ? fileOps.parentPath(root.currentPath) : ""
             if (parent && parent !== root.currentPath)
                 root.fileActivated(parent, true)

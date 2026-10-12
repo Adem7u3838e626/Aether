@@ -22,6 +22,7 @@ class ConfigManager : public QObject
     Q_PROPERTY(bool showHidden READ showHidden NOTIFY configChanged)
     Q_PROPERTY(bool hiddenLast READ hiddenLast NOTIFY configChanged)
     Q_PROPERTY(bool rightClickToEditPath READ rightClickToEditPath NOTIFY configChanged)
+    Q_PROPERTY(bool singleClickOpensFolders READ singleClickOpensFolders NOTIFY configChanged)
     Q_PROPERTY(bool dependencyStartupCheck READ dependencyStartupCheck NOTIFY configChanged)
     Q_PROPERTY(QString sortBy READ sortBy NOTIFY configChanged)
     Q_PROPERTY(bool sortAscending READ sortAscending NOTIFY configChanged)
@@ -83,6 +84,7 @@ public:
     // Clicking a breadcrumb segment still navigates.
     bool hiddenLast() const;
     bool rightClickToEditPath() const;
+    bool singleClickOpensFolders() const;
     bool dependencyStartupCheck() const;
     QString sortBy() const;
     bool sortAscending() const;
@@ -186,6 +188,7 @@ private:
     bool m_showHidden;
     bool m_hiddenLast;
     bool m_rightClickToEditPath;
+    bool m_singleClickOpensFolders;
     bool m_dependencyStartupCheck;
     QString m_sortBy;
     bool m_sortAscending;

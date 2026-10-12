@@ -81,6 +81,7 @@ Window {
     property bool draftShowHidden: currentShowHidden
     property bool draftHiddenLast: config.hiddenLast
     property bool draftRightClickToEditPath: config.rightClickToEditPath
+    property bool draftSingleClickOpensFolders: config.singleClickOpensFolders
     property bool draftDependencyStartupCheck: config.dependencyStartupCheck
     property bool draftSidebarVisible: currentSidebarVisible
     // Must stay in sync with the quick-access entries in Sidebar.qml.
@@ -267,6 +268,7 @@ Window {
         draftShowHidden = false
         draftHiddenLast = false
         draftRightClickToEditPath = true
+        draftSingleClickOpensFolders = false
         draftDependencyStartupCheck = true
         draftSidebarVisible = true
         draftHiddenQuickAccess = []
@@ -314,6 +316,7 @@ Window {
             draftShowHidden = currentShowHidden
             draftHiddenLast = config.hiddenLast
             draftRightClickToEditPath = config.rightClickToEditPath
+            draftSingleClickOpensFolders = config.singleClickOpensFolders
             draftDependencyStartupCheck = config.dependencyStartupCheck
             draftSidebarVisible = currentSidebarVisible
             draftHiddenQuickAccess = config.hiddenQuickAccess
@@ -387,6 +390,7 @@ Window {
             showHidden: draftShowHidden,
             hiddenLast: draftHiddenLast,
             rightClickToEditPath: draftRightClickToEditPath,
+            singleClickOpensFolders: draftSingleClickOpensFolders,
             dependencyStartupCheck: draftDependencyStartupCheck,
             sidebarVisible: draftSidebarVisible,
             hiddenQuickAccess: draftHiddenQuickAccess,
@@ -703,6 +707,16 @@ Window {
                 checked: root.draftRightClickToEditPath
                 onToggled: (value) => {
                     root.draftRightClickToEditPath = value
+                    root.applySettingsNow()
+                }
+            }
+
+            Q.Toggle {
+                Layout.fillWidth: true
+                label: "Open folders with a single click"
+                checked: root.draftSingleClickOpensFolders
+                onToggled: (value) => {
+                    root.draftSingleClickOpensFolders = value
                     root.applySettingsNow()
                 }
             }

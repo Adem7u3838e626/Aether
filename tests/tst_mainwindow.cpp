@@ -12,6 +12,7 @@
 #include <QQuickStyle>
 #include <QQuickWindow>
 #include <QScopeGuard>
+#include <QStyleHints>
 #include <functional>
 #include <QTemporaryDir>
 #include <QWheelEvent>
@@ -717,6 +718,41 @@ private slots:
         auto *item = root->property(dialog.toUtf8()).value<QQuickItem *>();
         QVERIFY(item);
         QTRY_VERIFY(item->isVisible());
+    }
+
+    // single_click_opens_folders: a click opens a folder, Ctrl+click only
+    // selects it, and a habitual double-click does not carry its second
+    // click into the folder it just opened (#51).
+    void testSingleClickOpensFolders()
+    {
+        App app;
+        const QString configDir = app.home.path() + "/.config/hyprfm";
+        QDir().mkpath(configDir);
+        {
+            QFile f(configDir + "/config.toml");
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write("[general]\nsingle_click_opens_folders = true\n");
+        }
+        QVERIFY(app.load());
+        // "a" holds "b" in the same spot, where a leaked second click lands.
+        const QString root = app.home.path() + "/root";
+        QVERIFY(QDir().mkpath(root + "/a/b"));
+        QObject *main = app.window->contentItem()->parent();
+        QVERIFY(QMetaObject::invokeMethod(main, "navigateActivePaneTo", Q_ARG(QVariant, root)));
+        QTRY_VERIFY(App::findText(app.window->contentItem(), QStringLiteral("a")));
+        // findText hits the tile's hidden measuring label; click the tile.
+        QQuickItem *tile = App::findText(app.window->contentItem(), QStringLiteral("a"))->parentItem();
+        QTRY_VERIFY(tile->isVisible() && tile->width() > 0);
+        const QPoint a = app.center(tile);
+
+        QTest::mouseClick(app.window, Qt::LeftButton, Qt::ControlModifier, a);
+        QTest::qWait(QGuiApplication::styleHints()->mouseDoubleClickInterval() + 50);
+        QCOMPARE(app.tabModel->activeTab()->currentPath(), root);
+
+        QTest::mouseDClick(app.window, Qt::LeftButton, {}, a);
+        QTRY_COMPARE(app.tabModel->activeTab()->currentPath(), root + "/a");
+        QTest::qWait(300);
+        QCOMPARE(app.tabModel->activeTab()->currentPath(), root + "/a");
     }
 
     // Activating a program asks how to run it instead of handing it to

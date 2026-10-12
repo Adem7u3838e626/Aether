@@ -299,6 +299,7 @@ void ConfigManager::setDefaults()
     m_showHidden = false;
     m_hiddenLast = false;
     m_rightClickToEditPath = true;
+    m_singleClickOpensFolders = false;
     m_sortBy = "name";
     m_sortAscending = true;
     m_rememberSortPerFolder = true;
@@ -371,6 +372,8 @@ void ConfigManager::loadConfig()
             m_hiddenLast = *v;
         if (auto v = config["general"]["right_click_to_edit_path"].value<bool>())
             m_rightClickToEditPath = *v;
+        if (auto v = config["general"]["single_click_opens_folders"].value<bool>())
+            m_singleClickOpensFolders = *v;
         if (auto v = config["general"]["dependency_startup_check"].value<bool>())
             m_dependencyStartupCheck = *v;
         if (auto v = config["general"]["sort_by"].value<std::string>())
@@ -612,6 +615,10 @@ hidden_last = false
 # whole path selected, just like Ctrl+L. Left clicks on breadcrumb segments
 # still navigate.
 right_click_to_edit_path = true
+
+# Open folders with a single click in the grid and details views. Files still
+# open on double-click; Ctrl/Shift+click still selects.
+single_click_opens_folders = false
 
 # Sort order: "name" | "size" | "modified" | "type"
 sort_by = "name"
@@ -872,6 +879,7 @@ bool ConfigManager::showHidden() const { return m_showHidden; }
 
 bool ConfigManager::hiddenLast() const { return m_hiddenLast; }
 bool ConfigManager::rightClickToEditPath() const { return m_rightClickToEditPath; }
+bool ConfigManager::singleClickOpensFolders() const { return m_singleClickOpensFolders; }
 bool ConfigManager::dependencyStartupCheck() const { return m_dependencyStartupCheck; }
 QString ConfigManager::sortBy() const { return m_sortBy; }
 bool ConfigManager::sortAscending() const { return m_sortAscending; }
@@ -1121,6 +1129,11 @@ void ConfigManager::saveSettings(const QVariantMap &settings)
     if (settings.contains("rightClickToEditPath")) {
         m_rightClickToEditPath = settings.value("rightClickToEditPath").toBool();
         general.insert_or_assign("right_click_to_edit_path", m_rightClickToEditPath);
+    }
+
+    if (settings.contains("singleClickOpensFolders")) {
+        m_singleClickOpensFolders = settings.value("singleClickOpensFolders").toBool();
+        general.insert_or_assign("single_click_opens_folders", m_singleClickOpensFolders);
     }
 
     if (settings.contains("dependencyStartupCheck")) {
