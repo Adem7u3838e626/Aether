@@ -1352,6 +1352,9 @@ private slots:
         QVERIFY(passwordSpy.wait(5000));
         QCOMPARE(passwordSpy.constFirst().at(2).toBool(), true);
         QVERIFY(ops.archivePassword(archivePath).isEmpty());
+        // This attempt's own "password required" lands after passwordRequested;
+        // cleared too early, it was read as the next attempt's result (CI flake).
+        QTRY_COMPARE(finishSpy.count(), 1);
 
         finishSpy.clear();
         ops.extractArchive(archivePath, extractDir.path(), QStringLiteral("testpass"));
