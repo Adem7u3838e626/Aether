@@ -5,6 +5,9 @@
 #include "services/xdgtrash.h"
 #include <QBuffer>
 #include <QClipboard>
+#include <QDBusConnection>
+#include <QDBusMessage>
+#include <QDBusPendingCallWatcher>
 #include <QDesktopServices>
 #include <QDir>
 #include <QDirIterator>
@@ -15,6 +18,7 @@
 #include <QImage>
 #include <QMimeData>
 #include <QPixmap>
+#include <QRandomGenerator>
 #include <QRegularExpression>
 #include <QSettings>
 #include <QSet>
@@ -2467,6 +2471,86 @@ QString FileOperations::newExtractionFolder(const QString &archivePath)
     }
     m_ownedExtractionDirs.insert(dir);
     return dir;
+}
+
+namespace {
+const QString kPortalService = QStringLiteral("org.freedesktop.portal.Desktop");
+const QString kPortalRequest = QStringLiteral("org.freedesktop.portal.Request");
+}
+
+// "Extract To...": the folder chooser comes from xdg-desktop-portal, the same
+// GTK/KDE dialog the rest of the desktop uses, and it works inside Flatpak.
+// Its answer is a Response signal on a request object whose path follows
+// from handle_token, so the listener goes up before the call: a fast answer
+// could otherwise arrive before anyone is listening.
+void FileOperations::extractArchiveTo(const QString &archivePath)
+{
+    stopWaitingForExtractFolder();   // a newer ask replaces an unanswered one
+
+    QDBusConnection bus = QDBusConnection::sessionBus();
+    const QString token = QStringLiteral("hyprfm%1").arg(QRandomGenerator::global()->generate());
+    QString sender = bus.baseService().mid(1);   // ":1.42" -> "1_42"
+    sender.replace(QLatin1Char('.'), QLatin1Char('_'));
+    m_extractToRequest = QStringLiteral("/org/freedesktop/portal/desktop/request/%1/%2")
+                             .arg(sender, token);
+    m_extractToArchive = archivePath;
+    bus.connect(kPortalService, m_extractToRequest, kPortalRequest, QStringLiteral("Response"),
+                this, SLOT(onExtractFolderChosen(uint,QVariantMap)));
+
+    const QString folder = parentLocation(normalizeLocation(archivePath));
+    QDBusMessage call = QDBusMessage::createMethodCall(
+        kPortalService, QStringLiteral("/org/freedesktop/portal/desktop"),
+        QStringLiteral("org.freedesktop.portal.FileChooser"), QStringLiteral("OpenFile"));
+    call << QString()
+         << QStringLiteral("Extract \u201c%1\u201d To").arg(locationFileName(archivePath))
+         << QVariantMap{
+                {QStringLiteral("handle_token"), token},
+                {QStringLiteral("directory"), true},
+                {QStringLiteral("modal"), true},
+                {QStringLiteral("accept_label"), QStringLiteral("Extract Here")},
+                {QStringLiteral("current_folder"), QByteArray(folder.toUtf8() + '\0')},
+            };
+    const auto fail = [this]() {
+        stopWaitingForExtractFolder();
+        emit operationFinished(false,
+            QStringLiteral("No folder picker available: xdg-desktop-portal is not running"));
+    };
+    const QDBusPendingCall pending = bus.asyncCall(call);
+    // With no session bus at all the call has already failed, and a watcher
+    // made now would never report it.
+    if (pending.isFinished()) {
+        if (pending.isError())
+            fail();
+        return;
+    }
+    auto *watcher = new QDBusPendingCallWatcher(pending, this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this, [watcher, fail]() {
+        watcher->deleteLater();
+        if (watcher->isError())
+            fail();
+    });
+}
+
+void FileOperations::onExtractFolderChosen(uint response, const QVariantMap &results)
+{
+    const QString archive = m_extractToArchive;
+    stopWaitingForExtractFolder();
+    const QStringList uris = results.value(QStringLiteral("uris")).toStringList();
+    if (response != 0 || archive.isEmpty() || uris.isEmpty())
+        return;   // cancelled
+    const QString destination = QUrl(uris.constFirst()).toLocalFile();
+    if (!destination.isEmpty())
+        extractArchive(archive, destination, archivePassword(archive));
+}
+
+void FileOperations::stopWaitingForExtractFolder()
+{
+    if (!m_extractToRequest.isEmpty())
+        QDBusConnection::sessionBus().disconnect(
+            kPortalService, m_extractToRequest, kPortalRequest, QStringLiteral("Response"),
+            this, SLOT(onExtractFolderChosen(uint,QVariantMap)));
+    m_extractToRequest.clear();
+    m_extractToArchive.clear();
 }
 
 QString FileOperations::archivePassword(const QString &archivePath) const

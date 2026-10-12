@@ -712,8 +712,11 @@ Item {
                 }
 
                 // Extract option for archives
-                if (!remoteContext && !targetIsDir && fileOps.isArchive(targetPath))
+                if (!remoteContext && !targetIsDir && fileOps.isArchive(targetPath)) {
                     items.push({ text: "Extract Here", shortcut: "", action: "extract", icon: "PackageOpen" })
+                    items.push({ text: "Extract to New Folder", shortcut: "", action: "extract_folder", icon: "FolderArchive" })
+                    items.push({ text: "Extract To\u2026", shortcut: "", action: "extract_to", icon: "Folder" })
+                }
 
                 // Set as wallpaper for image files
                 if (!remoteContext && !targetIsDir && typeof mime === "string" && mime.startsWith("image/"))
@@ -825,6 +828,14 @@ Item {
         case "compress_tarzst": fileOps.compressFiles(effectivePaths, "tar.zst"); break
         case "compress_tar": fileOps.compressFiles(effectivePaths, "tar"); break
         case "extract": fileOps.extractArchive(targetPath, effectiveDir, fileOps.archivePassword(targetPath)); break
+        case "extract_folder": {
+            // Same folder Enter on an archive unpacks into, without navigating.
+            var dest = fileOps.newExtractionFolder(targetPath)
+            if (dest)
+                fileOps.extractArchive(targetPath, dest, fileOps.archivePassword(targetPath))
+            break
+        }
+        case "extract_to": fileOps.extractArchiveTo(targetPath); break
         case "setwallpaper": fileOps.setWallpaper(targetPath); break
         case "emptytrash": emptyTrashRequested(); break
         default:

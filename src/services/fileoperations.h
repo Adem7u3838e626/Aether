@@ -91,6 +91,9 @@ public:
     Q_INVOKABLE void cacheArchivePassword(const QString &archivePath, const QString &password);
     Q_INVOKABLE void clearArchivePassword(const QString &archivePath);
     Q_INVOKABLE QString newExtractionFolder(const QString &archivePath);
+    // "Extract To...": asks for a folder through the desktop portal's file
+    // chooser, then extracts there. Cancelling does nothing.
+    Q_INVOKABLE void extractArchiveTo(const QString &archivePath);
     Q_INVOKABLE static bool isArchive(const QString &path);
     // A reported (current, total) as a fraction for the UI: always 0..1, or
     // -1 when there is no total to measure against. Clamped here because a
@@ -121,8 +124,16 @@ signals:
     // are not satisfied by another one finishing first.
     void operationFinished(bool success, const QString &error, int operationId = -1);
 
+private slots:
+    void onExtractFolderChosen(uint response, const QVariantMap &results);
+
 private:
     void startTerminal(const QString &dirPath, const QStringList &command);
+    void stopWaitingForExtractFolder();
+    // The archive waiting on the portal's folder chooser, and the request
+    // object its answer arrives on.
+    QString m_extractToArchive;
+    QString m_extractToRequest;
     struct ActiveTransfer {
         int id = 0;
         QThread *thread = nullptr;

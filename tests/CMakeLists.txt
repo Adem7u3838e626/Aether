@@ -51,7 +51,7 @@ add_executable(tst_fileoperations tst_fileoperations.cpp
     ${CMAKE_SOURCE_DIR}/src/services/giotransferworker.cpp
 )
 target_include_directories(tst_fileoperations PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(tst_fileoperations PRIVATE Qt6::Test Qt6::Core Qt6::Gui PkgConfig::GIO)
+target_link_libraries(tst_fileoperations PRIVATE Qt6::Test Qt6::Core Qt6::Gui Qt6::DBus PkgConfig::GIO)
 add_test(NAME tst_fileoperations COMMAND tst_fileoperations)
 # Shares gio trash state with tst_giotransferworker; serialize to avoid flakes.
 set_tests_properties(tst_fileoperations PROPERTIES
@@ -67,7 +67,7 @@ add_executable(tst_undomanager tst_undomanager.cpp
     ${CMAKE_SOURCE_DIR}/src/services/giotransferworker.cpp
 )
 target_include_directories(tst_undomanager PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(tst_undomanager PRIVATE Qt6::Test Qt6::Core Qt6::Gui PkgConfig::GIO)
+target_link_libraries(tst_undomanager PRIVATE Qt6::Test Qt6::Core Qt6::Gui Qt6::DBus PkgConfig::GIO)
 add_test(NAME tst_undomanager COMMAND tst_undomanager)
 
 add_executable(tst_previewservice tst_previewservice.cpp
