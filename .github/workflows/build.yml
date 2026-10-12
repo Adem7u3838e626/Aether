@@ -271,9 +271,11 @@ jobs:
         # catalog tests on.
         run: |
           set -euo pipefail
-          max=$(find AppDir -type f -print0 \
-                | xargs -0 file -N -F '|' | awk -F'|' '/ ELF /{print $1}' \
-                | xargs -r objdump -T 2>/dev/null \
+          # objdump -T fails on an ELF with no dynamic symbols (a static
+          # helper); those need no glibc at all, so a failure there is fine.
+          max=$( (find AppDir -type f -print0 \
+                  | xargs -0 file -N -F '|' | awk -F'|' '/ ELF /{print $1}' \
+                  | xargs -r objdump -T 2>/dev/null || true) \
                 | grep -o 'GLIBC_[0-9.]*' | sort -Vu | tail -1)
           echo "Newest glibc symbol needed: $max"
           if [ "$(printf '%s\n' GLIBC_2.35 "$max" | sort -V | tail -1)" != GLIBC_2.35 ]; then
