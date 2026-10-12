@@ -2640,6 +2640,21 @@ void FileOperations::cancelTransfer(int transferId)
     }
 }
 
+// Stops and joins every worker before the members they call back into go
+// away. A worker still running when this was destroyed (the app quitting
+// mid-extraction, a test returning early) used freed memory and crashed.
+FileOperations::~FileOperations()
+{
+    cancelTransfer(-1);
+    for (const ActiveTransfer &t : std::as_const(m_activeTransfers)) {
+        if (t.thread) {
+            t.thread->quit();
+            t.thread->wait();
+            delete t.thread;
+        }
+    }
+}
+
 void FileOperations::cleanupTransfer(int transferId)
 {
     for (int i = 0; i < m_activeTransfers.size(); ++i) {

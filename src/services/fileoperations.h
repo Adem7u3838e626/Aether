@@ -29,6 +29,7 @@ class FileOperations : public QObject
 
 public:
     explicit FileOperations(QObject *parent = nullptr);
+    ~FileOperations() override;
 
     bool busy() const;
     double progress() const;

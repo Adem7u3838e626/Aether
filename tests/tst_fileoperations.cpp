@@ -6,6 +6,7 @@
 #include <QFile>
 #include <QDir>
 #include <QDirIterator>
+#include <QElapsedTimer>
 #include <QGuiApplication>
 #include <QImage>
 #include <QMimeData>
@@ -1530,6 +1531,29 @@ private slots:
 
     // Pausing an extraction freezes the underlying process, so the byte-based
     // progress must stop moving until it is resumed.
+    // Destroying FileOperations mid-extraction (quitting during one) cancels
+    // and joins the worker instead of leaving it to call into freed memory.
+    void testDestroyingDuringExtractionStopsTheWorker()
+    {
+        if (QStandardPaths::findExecutable(QStringLiteral("7z")).isEmpty())
+            QSKIP("7z not found in PATH");
+        TestDir archiveDir;
+        TestDir extractDir;
+        const QString archivePath = createWideArchive(archiveDir, 120, 256 * 1024);
+        QVERIFY(!archivePath.isEmpty());
+
+        QElapsedTimer timer;
+        {
+            FileOperations ops;
+            QVERIFY(ops.extractArchive(archivePath, extractDir.path()) >= 0);
+            QTRY_VERIFY_WITH_TIMEOUT(ops.busy(), 5000);
+            timer.start();
+        }
+        // Cancelled, not waited out: a full extraction takes far longer.
+        QVERIFY2(timer.elapsed() < 5000, qPrintable(QString::number(timer.elapsed())));
+        QTest::qWait(200);   // a stray queued callback would land (and crash) here
+    }
+
     void testPauseFreezesExtractProgress()
     {
         if (QStandardPaths::findExecutable(QStringLiteral("7z")).isEmpty())
