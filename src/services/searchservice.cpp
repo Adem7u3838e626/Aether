@@ -160,12 +160,13 @@ void SearchService::startFdSearch(const QString &rootPath, const QString &patter
     if (isGlob) {
         if (pattern.contains('/'))
             args << "--full-path";
-        args << "--glob" << pattern;
+        args << "--glob";
     } else {
         args << "--full-path";
-        args << "--fixed-strings" << pattern;
+        args << "--fixed-strings";
     }
-    args << ".";
+    // "--" so a query starting with "-" is searched for, not read as a flag.
+    args << "--" << pattern << ".";
 
     connect(m_fdProcess, &QProcess::readyReadStandardOutput, this, &SearchService::handleFdOutput);
     connect(m_fdProcess, &QProcess::finished, this, &SearchService::handleFdFinished);

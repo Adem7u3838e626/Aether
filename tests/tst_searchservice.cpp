@@ -110,6 +110,31 @@ private slots:
         QVERIFY(model.rowCount() >= 2);
     }
 
+    // A query that starts with "-" is a name to find, not an fd option.
+    void testSearchForLeadingDash()
+    {
+        TestDir dir;
+        dir.createFile("-draft.txt");
+        dir.createFile("-x.cpp");
+        dir.createFile("other.txt");
+
+        SearchResultsModel model;
+        SearchService service;
+        service.setResultsModel(&model);
+
+        QSignalSpy spy(&service, &SearchService::searchFinished);
+        service.startSearch(dir.path(), "-draft", false);
+        QVERIFY(spy.wait(5000));
+        QCOMPARE(model.rowCount(), 1);
+        QVERIFY(model.filePath(0).endsWith("-draft.txt"));
+
+        spy.clear();
+        service.startSearch(dir.path(), "-x*", false);
+        QVERIFY(spy.wait(5000));
+        QCOMPARE(model.rowCount(), 1);
+        QVERIFY(model.filePath(0).endsWith("-x.cpp"));
+    }
+
     void testSearchEmitsProgress()
     {
         TestDir dir;
