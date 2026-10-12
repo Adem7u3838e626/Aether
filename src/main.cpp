@@ -633,28 +633,21 @@ int main(int argc, char *argv[])
     fmt.setSamples(qMax(0, qEnvironmentVariableIntValue("HYPRFM_MSAA")));
     QSurfaceFormat::setDefaultFormat(fmt);
 
-    // HyprFM is a Wayland-only application (wl-copy clipboard, Hyprland
-    // integration, KWin blur effects). Detect a non-Wayland session before
-    // Qt tries to load the wayland QPA plugin so users see an actionable
-    // message instead of the cryptic "Failed to create wl_display" error.
-    if (qEnvironmentVariableIsEmpty("WAYLAND_DISPLAY")) {
-        const QByteArray sessionType = qgetenv("XDG_SESSION_TYPE");
-        const char *session = sessionType.isEmpty() ? "unknown" : sessionType.constData();
+    // HyprFM runs on Wayland and, through Qt's X11 backend, on X11. With no
+    // display at all Qt would abort with a cryptic "could not connect to
+    // display" (or "Failed to create wl_display"), so say what is missing.
+    // An explicit QT_QPA_PLATFORM (offscreen in tests and the AppImage smoke
+    // test, or a user's choice) is left for Qt to judge.
+    if (qEnvironmentVariableIsEmpty("WAYLAND_DISPLAY") && qEnvironmentVariableIsEmpty("DISPLAY")
+        && qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM")) {
         fprintf(stderr,
                 "\n"
-                "HyprFM: no Wayland display available (XDG_SESSION_TYPE=%s).\n"
+                "HyprFM: no display found: neither $WAYLAND_DISPLAY nor $DISPLAY is set.\n"
                 "\n"
-                "HyprFM only supports Wayland sessions. Your current session\n"
-                "appears to be X11 or does not expose $WAYLAND_DISPLAY.\n"
-                "\n"
-                "To run HyprFM:\n"
-                "  * Log out and pick a Wayland session at the login screen\n"
-                "    (e.g. \"Ubuntu on Wayland\", GNOME on Wayland, Hyprland, KDE\n"
-                "    Plasma Wayland).\n"
-                "  * If running via Flatpak, also grant Wayland socket access:\n"
-                "      flatpak override --user --socket=wayland io.github.soyeb_jim285.HyprFM\n"
-                "\n",
-                session);
+                "Start HyprFM from a graphical session (Wayland or X11).\n"
+                "If running via Flatpak, grant display access:\n"
+                "  flatpak override --user --socket=wayland --socket=fallback-x11 io.github.soyeb_jim285.HyprFM\n"
+                "\n");
         return 1;
     }
 

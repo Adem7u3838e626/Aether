@@ -101,6 +101,8 @@ public:
     // miscounted total should slow the bar down, never send it past full.
     static double progressFraction(int current, int total);
     Q_INVOKABLE void setWallpaper(const QString &path);
+    // Running under Hyprland: hyprctl, hyprpaper and window rules apply.
+    Q_INVOKABLE bool isHyprland() const;
     Q_INVOKABLE void setHyprlandRounding(const QString &windowTitle, int radius);
     Q_INVOKABLE void setHyprlandBorder(const QString &windowTitle, int size);
 

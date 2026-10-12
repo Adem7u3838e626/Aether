@@ -719,7 +719,7 @@ Item {
                 }
 
                 // Set as wallpaper for image files
-                if (!remoteContext && !targetIsDir && typeof mime === "string" && mime.startsWith("image/"))
+                if (!remoteContext && !targetIsDir && fileOps.isHyprland() && typeof mime === "string" && mime.startsWith("image/"))
                     items.push({ text: "Set as Wallpaper", shortcut: "", action: "setwallpaper", icon: "Image" })
 
                 items.push({ separator: true })

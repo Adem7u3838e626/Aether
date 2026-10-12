@@ -1987,12 +1987,24 @@ QString FileOperations::pasteClipboardImage(const QString &destinationDir)
     return outputPath;
 }
 
+// wl-copy on Wayland keeps the path on the clipboard after HyprFM exits;
+// elsewhere (X11), or without wl-clipboard, Qt's clipboard does the job.
 void FileOperations::copyPathToClipboard(const QString &path)
 {
-    auto *proc = new QProcess(this);
-    proc->start("wl-copy", {path});
-    connect(proc, qOverload<int, QProcess::ExitStatus>(&QProcess::finished),
-            proc, &QProcess::deleteLater);
+    if (QGuiApplication::platformName() == QLatin1String("wayland")
+        && !QStandardPaths::findExecutable(QStringLiteral("wl-copy")).isEmpty()) {
+        auto *proc = new QProcess(this);
+        proc->start(QStringLiteral("wl-copy"), {path});
+        connect(proc, qOverload<int, QProcess::ExitStatus>(&QProcess::finished),
+                proc, &QProcess::deleteLater);
+        return;
+    }
+    QGuiApplication::clipboard()->setText(path);
+}
+
+bool FileOperations::isHyprland() const
+{
+    return !qEnvironmentVariableIsEmpty("HYPRLAND_INSTANCE_SIGNATURE");
 }
 
 void FileOperations::openInTerminal(const QString &dirPath)
@@ -2976,6 +2988,8 @@ void FileOperations::setWallpaper(const QString &path)
 
 void FileOperations::setHyprlandRounding(const QString &windowTitle, int radius)
 {
+    if (!isHyprland())
+        return;
     auto *proc = new QProcess(this);
     connect(proc, qOverload<int, QProcess::ExitStatus>(&QProcess::finished),
             this, [proc](int, QProcess::ExitStatus) { proc->deleteLater(); });
@@ -2988,6 +3002,8 @@ void FileOperations::setHyprlandRounding(const QString &windowTitle, int radius)
 
 void FileOperations::setHyprlandBorder(const QString &windowTitle, int size)
 {
+    if (!isHyprland())
+        return;
     auto *proc = new QProcess(this);
     connect(proc, qOverload<int, QProcess::ExitStatus>(&QProcess::finished),
             this, [proc](int, QProcess::ExitStatus) { proc->deleteLater(); });

@@ -200,15 +200,18 @@ void DependencyChecker::populate()
         })
     });
 
-    m_deps.append({
-        QStringLiteral("wl-clipboard"),
-        QStringLiteral("wl-clipboard"),
-        QStringLiteral("Copy and paste files and images under Wayland."),
-        Kind::Tool, false,
-        hasExecutable(QStringLiteral("wl-copy")) && hasExecutable(QStringLiteral("wl-paste")),
-        {QStringLiteral("wl-copy"), QStringLiteral("wl-paste")},
-        buildHints(QStringLiteral("wl-clipboard"))
-    });
+    // Only Wayland needs it: on X11 Qt's own clipboard covers everything.
+    if (!qEnvironmentVariableIsEmpty("WAYLAND_DISPLAY")) {
+        m_deps.append({
+            QStringLiteral("wl-clipboard"),
+            QStringLiteral("wl-clipboard"),
+            QStringLiteral("Copy and paste files and images under Wayland."),
+            Kind::Tool, false,
+            hasExecutable(QStringLiteral("wl-copy")) && hasExecutable(QStringLiteral("wl-paste")),
+            {QStringLiteral("wl-copy"), QStringLiteral("wl-paste")},
+            buildHints(QStringLiteral("wl-clipboard"))
+        });
+    }
 
     m_deps.append({
         QStringLiteral("ffmpeg"),

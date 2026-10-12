@@ -116,7 +116,7 @@ HyprFM is a Qt6/QML file manager designed to feel native on Hyprland: lightweigh
 - **udisks2** mount/unmount of removable drives
 - **gvfs / gio** for SFTP, SMB and MTP (the trash is read directly and does not need it)
 - **Git status overlays** in file lists (modified, staged, untracked, …)
-- **wl-clipboard** for system clipboard
+- **wl-clipboard** for the system clipboard on Wayland
 - **bat** for syntax-highlighted text previews
 - **md4c** for rendered Markdown previews (via `md2html`)
 - **ffmpeg** for video poster thumbnails
@@ -239,7 +239,7 @@ The result lands in the repo root as `HyprFM-<version>-x86_64.AppImage`. The scr
 | **Required (build)** | `cmake`, `ninja`, `qt6-base`, `qt6-declarative`, `qt6-svg` |
 | **Required (runtime)** | `qt6-base`, `qt6-declarative`, `qt6-svg`, `qt6-wayland`, `glib2`, `xdg-utils` |
 | **Archives** | `tar`, `gzip`, `bzip2`, `xz`, `zstd`, `zip`, `unzip`, `p7zip` (`7z`), `libarchive` (`bsdtar`). Compress and extract call these by name, so a missing one only breaks that format. |
-| **Optional** | `kwindowsystem` / `KF6WindowSystem` (native KDE blur), `wl-clipboard` (clipboard), `fd` (fast search), `bat` (syntax highlighting), `md4c` (rendered Markdown previews via `md2html`; see the note below), `git` (git status overlays), `gvfs` (SFTP/SMB/MTP; not needed for the trash), `gvfs-smb` (SMB), `gvfs-mtp` (Android/MTP phones), `ffmpeg` (video thumbnails), `exiftool` (metadata sidebar), `udisks2` (device mounting), `poppler` / `poppler-utils` (PDF previews via `pdftoppm`) |
+| **Optional** | `kwindowsystem` / `KF6WindowSystem` (native KDE blur), `wl-clipboard` (clipboard on Wayland), `fd` (fast search), `bat` (syntax highlighting), `md4c` (rendered Markdown previews via `md2html`; see the note below), `git` (git status overlays), `gvfs` (SFTP/SMB/MTP; not needed for the trash), `gvfs-smb` (SMB), `gvfs-mtp` (Android/MTP phones), `ffmpeg` (video thumbnails), `exiftool` (metadata sidebar), `udisks2` (device mounting), `poppler` / `poppler-utils` (PDF previews via `pdftoppm`) |
 
 A note on Markdown previews: `md2html` ships in the `md4c` package on Arch
 and Alpine, and in `pkgs.md4c` on Nix. Debian and Ubuntu package md4c's
