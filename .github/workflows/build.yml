@@ -198,10 +198,12 @@ jobs:
       - name: Download linuxdeploy and Qt plugin
         if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         run: |
-          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          # A fixed release, never "continuous": that one is rebuilt in place,
+          # so the checksum below broke the release as soon as upstream pushed.
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20251107-1/linuxdeploy-x86_64.AppImage
           wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/1-alpha-20250213-1/linuxdeploy-plugin-qt-x86_64.AppImage
           printf '%s  %s\n' \
-            '421ca71d5c69ea97c6309276232990d43df1dcece0edfaa26bbf926ff96ed12e' \
+            'c20cd71e3a4e3b80c3483cef793cda3f4e990aca14014d23c544ca3ce1270b4d' \
             'linuxdeploy-x86_64.AppImage' | sha256sum -c -
           printf '%s  %s\n' \
             '15106be885c1c48a021198e7e1e9a48ce9d02a86dd0a1848f00bdbf3c1c92724' \
