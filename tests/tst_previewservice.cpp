@@ -114,6 +114,46 @@ private slots:
 
     // The Markdown branch renders the text the line cap already trimmed, so a
     // long document costs no more than it does through bat.
+    // CSV/TSV come back as table rows, not bat output: quotes may hold the
+    // delimiter, "" and newlines, a semicolon export is sniffed, and a read
+    // that stops mid-row drops that row instead of showing half of it.
+    void testDelimitedFilesPreviewAsTables()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const auto write = [&](const QString &name, const QByteArray &data) {
+            QFile file(dir.filePath(name));
+            if (file.open(QIODevice::WriteOnly))
+                file.write(data);
+            return file.fileName();
+        };
+        const auto rows = [](const QVariantMap &preview) {
+            QList<QStringList> out;
+            for (const QVariant &row : preview.value("table").toMap().value("rows").toList())
+                out.append(row.toStringList());
+            return out;
+        };
+        PreviewService service;
+
+        QVariantMap preview = service.loadTextPreview(write("a.csv",
+            "name,note\r\n\"Doe, Jane\",\"said \"\"hi\"\"\nthen left\"\r\nBob,\r\n"));
+        QCOMPARE(preview.value("usesBat").toBool(), false);
+        QCOMPARE(rows(preview), (QList<QStringList>{
+            {"name", "note"}, {"Doe, Jane", "said \"hi\" then left"}, {"Bob", ""}}));
+        QCOMPARE(preview.value("truncated").toBool(), false);
+
+        preview = service.loadTextPreview(write("eu.csv", "a;b;c\n1,5;2;3\n"));
+        QCOMPARE(rows(preview), (QList<QStringList>{{"a", "b", "c"}, {"1,5", "2", "3"}}));
+
+        preview = service.loadTextPreview(write("t.tsv", "x\ty,z\n1\t2\n"));
+        QCOMPARE(rows(preview), (QList<QStringList>{{"x", "y,z"}, {"1", "2"}}));
+
+        // 16 bytes ends inside "row2": that half row is dropped.
+        preview = service.loadTextPreview(write("cut.csv", "h1,h2\nrow1,v\nrow2,v\n"), 16);
+        QCOMPARE(rows(preview), (QList<QStringList>{{"h1", "h2"}, {"row1", "v"}}));
+        QCOMPARE(preview.value("truncated").toBool(), true);
+    }
+
     void testMarkdownPreviewHonoursTheLineCap()
     {
         if (QStandardPaths::findExecutable(QStringLiteral("md2html")).isEmpty())

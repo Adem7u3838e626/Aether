@@ -140,6 +140,7 @@ Item {
     // treatment rather than be laid out as a document on the strength of an
     // extension alone.
     readonly property bool isMarkdown: textPreview.markdown === true
+    readonly property bool isTable: textPreview.table !== undefined
     // A document's own folder, for the relative image paths a README is
     // written against ("docs/screenshots/grid-view.png"). Without it Qt
     // resolves them against the qrc: path this component was loaded from and
@@ -856,7 +857,7 @@ Item {
                         Flickable {
                             id: textPreviewFlick
                             anchors.fill: parent
-                            visible: root.isText && !root.hasVisualPreview && !root.isPdf
+                            visible: root.isText && !root.isTable && !root.hasVisualPreview && !root.isPdf
                             clip: true
                             interactive: true
                             boundsMovement: Flickable.StopAtBounds
@@ -911,6 +912,12 @@ Item {
                             ScrollBar.horizontal: ScrollBar { policy: ScrollBar.AsNeeded }
                         }
 
+                        CsvTable {
+                            anchors.fill: parent
+                            visible: root.isText && root.isTable && !root.hasVisualPreview && !root.isPdf
+                            table: visible ? textPreview.table : ({})
+                        }
+
                         KineticWheelScroller {
                             anchors.fill: textPreviewFlick
                             visible: textPreviewFlick.visible
@@ -927,7 +934,7 @@ Item {
                             anchors.right: parent.right
                             anchors.bottom: parent.bottom
                             anchors.bottomMargin: 8
-                            visible: root.isText && textPreview.error === "" && !textPreview.isBinary && !textPreview.usesBat && !root.textHighlightAvailable
+                            visible: root.isText && !root.isTable && textPreview.error === "" && !textPreview.isBinary && !textPreview.usesBat && !root.textHighlightAvailable
                             text: runtimeFeatures.installHint("textHighlight")
                             color: Theme.subtext
                             font.pointSize: Theme.fontSmall

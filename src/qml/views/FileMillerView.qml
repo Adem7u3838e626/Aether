@@ -1366,6 +1366,7 @@ FocusScope {
             // no-wrap treatment rather than be laid out as a document on the
             // strength of an extension alone.
             readonly property bool isMarkdown: previewColumn.textPreview.markdown === true
+            readonly property bool isTable: previewColumn.textPreview.table !== undefined
             // A document's own folder, for the relative image paths a README
             // is written against; without it Qt resolves them against the qrc:
             // path this view was loaded from and draws a broken-image glyph
@@ -1799,7 +1800,7 @@ FocusScope {
                         id: textPreviewFlick
                         anchors.fill: parent
                         anchors.margins: 6
-                        visible: previewColumn.isText && !previewColumn.hasVisualPreview
+                        visible: previewColumn.isText && !previewColumn.isTable && !previewColumn.hasVisualPreview
                             && !previewColumn.previewIsDir && !previewColumn.isPdf && !previewColumn.isArchive
                         clip: true
                         interactive: true
@@ -1854,6 +1855,15 @@ FocusScope {
 
                         ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
                         ScrollBar.horizontal: ScrollBar { policy: ScrollBar.AsNeeded }
+                    }
+
+                    CsvTable {
+                        anchors.fill: parent
+                        anchors.margins: 6
+                        visible: previewColumn.isText && previewColumn.isTable && !previewColumn.hasVisualPreview
+                            && !previewColumn.previewIsDir && !previewColumn.isPdf && !previewColumn.isArchive
+                        table: visible ? previewColumn.textPreview.table : ({})
+                        fontSize: Theme.fontSmall - 1
                     }
 
                     Text {

@@ -110,6 +110,7 @@ list(APPEND hyprfm_qml_module_args
         qml/components/RemoteConnectDialog.qml
         qml/components/PreviewLoader.qml
         qml/components/QuickPreview.qml
+        qml/components/CsvTable.qml
         qml/components/Toast.qml
         qml/components/RubberBand.qml
         qml/icons/IconCheck.qml

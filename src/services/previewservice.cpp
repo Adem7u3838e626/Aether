@@ -312,6 +312,115 @@ bool isMarkdownPath(const QString &path)
         || ext == QLatin1String("mdown") || ext == QLatin1String("mkd");
 }
 
+// CSV/TSV get a table instead of bat: bat colours every field, and laying the
+// resulting rich text out took seconds on the GUI thread for a big file.
+bool isDelimitedPath(const QString &path)
+{
+    const QString ext = QFileInfo(path).suffix().toLower();
+    return ext == QLatin1String("csv") || ext == QLatin1String("tsv");
+}
+
+// Rows of cells for the table preview, the header first. Quoted fields may
+// hold the delimiter, newlines and "" escapes (RFC 4180). The delimiter is
+// whichever of , ; tab | the first line uses most, so European
+// semicolon-separated exports work too.
+// ponytail: sniffs the first line only; quote-aware sniffing if that misfires.
+QVariantMap delimitedTable(const QString &text, const QString &path, bool cutMidRow,
+                           int maxRows)
+{
+    QChar delimiter = QLatin1Char('\t');
+    if (QFileInfo(path).suffix().toLower() != QLatin1String("tsv")) {
+        const QStringView firstLine = QStringView(text).left(text.indexOf(QLatin1Char('\n')));
+        qsizetype best = 0;
+        delimiter = QLatin1Char(',');
+        for (const QChar c : {QLatin1Char(','), QLatin1Char(';'), QLatin1Char('\t'), QLatin1Char('|')}) {
+            if (const qsizetype n = firstLine.count(c); n > best) {
+                best = n;
+                delimiter = c;
+            }
+        }
+    }
+
+    // A cell is shown on one line and elided, so a long one only costs memory.
+    constexpr int kMaxCell = 300;
+    constexpr int kMaxWidthChars = 40;
+    QVariantList rows;
+    QList<int> widths;
+    QStringList row;
+    QString cell;
+    bool quoted = false;
+    bool truncated = false;
+    const auto endCell = [&]() {
+        cell.replace(QLatin1Char('\n'), QLatin1Char(' '));
+        if (cell.size() > kMaxCell)
+            cell.truncate(kMaxCell);
+        const int column = int(row.size());
+        if (column >= widths.size())
+            widths.append(3);
+        widths[column] = qMax(widths[column], int(qMin<qsizetype>(cell.size(), kMaxWidthChars)));
+        row.append(cell);
+        cell.clear();
+    };
+    const auto endRow = [&]() {
+        endCell();
+        rows.append(row);
+        row.clear();
+    };
+
+    // Runs of ordinary characters are copied in one slice, not char by char.
+    const auto runEnd = [&](qsizetype from, auto stop) {
+        while (from < text.size() && !stop(text.at(from)))
+            ++from;
+        return from;
+    };
+    for (qsizetype i = 0; i < text.size(); ++i) {
+        const QChar c = text.at(i);
+        if (quoted) {
+            if (c != QLatin1Char('"')) {
+                const qsizetype end = runEnd(i, [](QChar ch) { return ch == QLatin1Char('"'); });
+                cell += QStringView(text).sliced(i, end - i);
+                i = end - 1;
+            } else if (i + 1 < text.size() && text.at(i + 1) == QLatin1Char('"')) {
+                cell += text.at(++i);
+            } else {
+                quoted = false;
+            }
+        } else if (c == QLatin1Char('"') && cell.isEmpty()) {
+            quoted = true;
+        } else if (c == delimiter) {
+            endCell();
+        } else if (c == QLatin1Char('\n')) {
+            endRow();
+            if (rows.size() >= maxRows) {
+                truncated = i + 1 < text.size() || cutMidRow;
+                break;
+            }
+        } else if (c != QLatin1Char('\r')) {
+            const qsizetype end = runEnd(i, [delimiter](QChar ch) {
+                return ch == delimiter || ch == QLatin1Char('\n') || ch == QLatin1Char('\r');
+            });
+            cell += QStringView(text).sliced(i, end - i);
+            i = end - 1;
+        }
+    }
+    // The read stopped inside the last row: drop it rather than show half.
+    if (!truncated && (!row.isEmpty() || !cell.isEmpty())) {
+        if (cutMidRow)
+            truncated = true;
+        else
+            endRow();
+    }
+
+    QVariantList columnWidths;
+    for (const int w : std::as_const(widths))
+        columnWidths.append(w);
+    return {
+        {QStringLiteral("rows"), rows},
+        {QStringLiteral("columnWidths"), columnWidths},
+        {QStringLiteral("truncated"), truncated},
+    };
+}
+
 // Render Markdown to HTML via `md2html` (md4c). Reads the data on stdin so the
 // path never has to be quoted, and never touches a shell. Returns empty and
 // sets `error` when md2html is missing, times out, or fails.
@@ -501,6 +610,18 @@ QVariantMap PreviewService::loadTextPreview(const QString &path, int maxBytes, i
     QString text;
     if (!binary)
         text = decodeText(data);
+
+    if (!binary && isDelimitedPath(path)) {
+        const QVariantMap table = delimitedTable(text, path, truncated, 1000);
+        result["content"] = QString();
+        result["html"] = QString();
+        result["truncated"] = table.value(QStringLiteral("truncated"));
+        result["isBinary"] = false;
+        result["usesBat"] = false;
+        result["error"] = QString();
+        result["table"] = table;
+        return result;
+    }
 
     QStringList lines = text.split('\n');
     if (maxLines > 0 && lines.size() > maxLines) {
