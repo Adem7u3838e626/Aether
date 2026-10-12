@@ -154,6 +154,21 @@ private slots:
         QCOMPARE(preview.value("truncated").toBool(), true);
     }
 
+    void testCsvColumnsAreCapped()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        QFile file(dir.filePath("wide.csv"));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write(QByteArray(100000, ',') + "\n");
+        file.close();
+        PreviewService service;
+        const QVariantMap table = service.loadTextPreview(file.fileName(), 1024 * 1024)
+                                      .value("table").toMap();
+        QCOMPARE(table.value("columnWidths").toList().size(), 200);
+        QCOMPARE(table.value("rows").toList().constFirst().toStringList().size(), 200);
+    }
+
     void testMarkdownPreviewHonoursTheLineCap()
     {
         if (QStandardPaths::findExecutable(QStringLiteral("md2html")).isEmpty())

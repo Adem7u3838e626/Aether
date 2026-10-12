@@ -343,6 +343,9 @@ QVariantMap delimitedTable(const QString &text, const QString &path, bool cutMid
 
     // A cell is shown on one line and elided, so a long one only costs memory.
     constexpr int kMaxCell = 300;
+    // The table builds every column of a visible row, so a header of 100k
+    // commas would freeze the window.
+    constexpr int kMaxColumns = 200;
     constexpr int kMaxWidthChars = 40;
     QVariantList rows;
     QList<int> widths;
@@ -351,6 +354,10 @@ QVariantMap delimitedTable(const QString &text, const QString &path, bool cutMid
     bool quoted = false;
     bool truncated = false;
     const auto endCell = [&]() {
+        if (row.size() >= kMaxColumns) {
+            cell.clear();
+            return;
+        }
         cell.replace(QLatin1Char('\n'), QLatin1Char(' '));
         if (cell.size() > kMaxCell)
             cell.truncate(kMaxCell);
