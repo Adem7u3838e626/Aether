@@ -154,6 +154,36 @@ private slots:
         QCOMPARE(preview.value("truncated").toBool(), true);
     }
 
+    // JSON is re-indented, not parsed: key order survives, braces and quotes
+    // inside strings are left alone, a cut-off file still formats, and deep
+    // nesting cannot blow the output up.
+    void testJsonPreviewIsPrettyPrinted()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const auto write = [&](const QString &name, const QByteArray &data) {
+            QFile file(dir.filePath(name));
+            if (file.open(QIODevice::WriteOnly))
+                file.write(data);
+            return file.fileName();
+        };
+        PreviewService service;
+
+        QVariantMap preview = service.loadTextPreview(write("a.json",
+            "{\"z\":1,\"a\":[1,2,{}],\"s\":\"x{,}\\\"y\",\"e\":[]}"));
+        QCOMPARE(preview.value("content").toString(), QStringLiteral(
+            "{\n  \"z\": 1,\n  \"a\": [\n    1,\n    2,\n    {}\n  ],\n"
+            "  \"s\": \"x{,}\\\"y\",\n  \"e\": []\n}"));
+
+        // A read that stops mid-file still formats what it got.
+        preview = service.loadTextPreview(write("cut.json", "{\"k\":[1,2,3,4]}"), 9);
+        QCOMPARE(preview.value("content").toString(), QStringLiteral("{\n  \"k\": [\n    1,\n    2"));
+
+        preview = service.loadTextPreview(write("deep.json", QByteArray(100000, '[')), 1024 * 1024, 400);
+        QVERIFY(preview.value("content").toString().size() < 400 * 70);
+        QCOMPARE(preview.value("truncated").toBool(), true);
+    }
+
     void testCsvColumnsAreCapped()
     {
         QTemporaryDir dir;

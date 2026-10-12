@@ -428,6 +428,81 @@ QVariantMap delimitedTable(const QString &text, const QString &path, bool cutMid
     };
 }
 
+// Re-indents JSON token by token instead of parsing it: QJsonDocument would
+// sort object keys and reject a file cut off by the preview read, and a big
+// minified file is exactly the one that needs this. Stops after maxLines.
+QByteArray prettyJson(const QByteArray &json, int maxLines)
+{
+    // Deep nesting would otherwise cost depth * 2 bytes on every line.
+    constexpr int kMaxIndent = 32;
+    QByteArray out;
+    out.reserve(json.size() + json.size() / 2);
+    int depth = 0;
+    int lines = 1;
+    bool inString = false;
+    const auto isSpace = [](char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; };
+    const auto newline = [&]() {
+        out += '\n';
+        out.append(qMin(depth, kMaxIndent) * 2, ' ');
+        ++lines;
+    };
+    for (qsizetype i = 0; i < json.size() && (maxLines <= 0 || lines <= maxLines); ++i) {
+        const char c = json.at(i);
+        if (inString) {
+            out += c;
+            if (c == '\\' && i + 1 < json.size())
+                out += json.at(++i);
+            else if (c == '"')
+                inString = false;
+            continue;
+        }
+        if (isSpace(c))
+            continue;
+        switch (c) {
+        case '"':
+            inString = true;
+            out += c;
+            break;
+        case '{':
+        case '[': {
+            out += c;
+            qsizetype next = i + 1;
+            while (next < json.size() && isSpace(json.at(next)))
+                ++next;
+            if (next < json.size() && (json.at(next) == '}' || json.at(next) == ']')) {
+                out += json.at(next);   // {} and [] stay on one line
+                i = next;
+            } else {
+                ++depth;
+                newline();
+            }
+            break;
+        }
+        case '}':
+        case ']':
+            depth = qMax(depth - 1, 0);
+            newline();
+            out += c;
+            break;
+        case ',':
+            out += c;
+            newline();
+            break;
+        case ':':
+            out += ": ";
+            break;
+        default:
+            out += c;
+        }
+    }
+    return out;
+}
+
+bool isJsonPath(const QString &path)
+{
+    return QFileInfo(path).suffix().compare(QLatin1String("json"), Qt::CaseInsensitive) == 0;
+}
+
 // Render Markdown to HTML via `md2html` (md4c). Reads the data on stdin so the
 // path never has to be quoted, and never touches a shell. Returns empty and
 // sets `error` when md2html is missing, times out, or fails.
@@ -601,7 +676,7 @@ QVariantMap PreviewService::loadTextPreview(const QString &path, int maxBytes, i
     QVariantMap result;
     bool truncated = false;
     QString error;
-    const QByteArray data = readPathBytes(path, maxBytes, &truncated, &error);
+    QByteArray data = readPathBytes(path, maxBytes, &truncated, &error);
 
     if (!error.isEmpty()) {
         result["content"] = QString();
@@ -614,6 +689,8 @@ QVariantMap PreviewService::loadTextPreview(const QString &path, int maxBytes, i
     }
 
     const bool binary = looksBinary(data);
+    if (!binary && isJsonPath(path))
+        data = prettyJson(data, maxLines);
     QString text;
     if (!binary)
         text = decodeText(data);
