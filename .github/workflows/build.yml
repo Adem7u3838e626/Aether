@@ -306,6 +306,10 @@ jobs:
           # component, then SIGTERM it. Any QML load failure will already be
           # on stderr by then.
           sleep 5
+          # Still running is the point: an app that exits early never loads
+          # the QML this step checks. Until the Wayland-only guard was dropped
+          # it exited right away here, and the step passed having tested nothing.
+          if kill -0 $SMOKE_PID 2>/dev/null; then ALIVE=1; else ALIVE=0; fi
           kill -TERM $SMOKE_PID 2>/dev/null || true
           wait $SMOKE_PID 2>/dev/null || true
           set -e
@@ -315,6 +319,10 @@ jobs:
           cat smoke.stderr || true
           if grep -E "is not a type|failed to load component|QQmlApplicationEngine failed|TypeError:|Unable to assign|Aborted \(core dumped\)|Segmentation fault|Failed to initialize graphics backend|Failed to create RHI" smoke.stderr; then
             echo "Smoke test FAILED: AppImage cannot load its QML."
+            exit 1
+          fi
+          if [ "$ALIVE" != 1 ]; then
+            echo "Smoke test FAILED: the AppImage exited within 5 seconds."
             exit 1
           fi
           echo "Smoke test passed."
