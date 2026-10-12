@@ -12,6 +12,7 @@ Rectangle {
     property bool canGoBack: false
     property bool canGoForward: false
     property bool splitViewEnabled: false
+    property bool isSplitHorizontal: false
     property bool isRecentsView: false
     property bool isTrashView: false
     property bool isRemoteView: false
@@ -67,6 +68,7 @@ Rectangle {
     signal upRequested()
     signal navigateRequested(string targetPath)
     signal splitViewToggled()
+    signal splitOrientationToggled()
     signal viewModeRequested(string mode)
     signal typeFilterChanged(string filter)
     signal dateFilterChanged(string filter)
@@ -342,9 +344,12 @@ Rectangle {
                             ? Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.1)
                             : "transparent")
                     onClicked: root.splitViewToggled()
+                    onRightClicked: root.splitOrientationToggled()
                     IconSquareSplitHorizontal {
                         anchors.centerIn: parent
                         size: 18
+                        rotation: root.isSplitHorizontal ? 90 : 0
+                        Behavior on rotation { NumberAnimation { duration: Theme.animDuration } }
                         color: root.splitViewEnabled ? Theme.accent : Theme.text
                     }
                 }

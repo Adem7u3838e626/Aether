@@ -19,6 +19,7 @@ class ConfigManager : public QObject
     Q_PROPERTY(QString iconTheme READ iconTheme NOTIFY configChanged)
     Q_PROPERTY(QString fontFamily READ fontFamily NOTIFY configChanged)
     Q_PROPERTY(QString defaultView READ defaultView NOTIFY configChanged)
+    Q_PROPERTY(QString splitOrientation READ splitOrientation NOTIFY configChanged)
     Q_PROPERTY(bool showHidden READ showHidden NOTIFY configChanged)
     Q_PROPERTY(bool hiddenLast READ hiddenLast NOTIFY configChanged)
     Q_PROPERTY(bool rightClickToEditPath READ rightClickToEditPath NOTIFY configChanged)
@@ -79,6 +80,7 @@ public:
     void setIconThemeFallback(const QString &theme);
     QString fontFamily() const;
     QString defaultView() const;
+    QString splitOrientation() const;
     bool showHidden() const;
     // Right click on the address bar starts path editing (Ctrl+L behaviour).
     // Clicking a breadcrumb segment still navigates.
@@ -185,6 +187,7 @@ private:
     QString m_iconThemeFallback;  // what empty resolves to
     QString m_fontFamily;
     QString m_defaultView;
+    QString m_splitOrientation;
     bool m_showHidden;
     bool m_hiddenLast;
     bool m_rightClickToEditPath;

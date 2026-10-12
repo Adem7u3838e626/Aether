@@ -96,6 +96,9 @@ const ShortcutSpec kShortcutSpecs[] = {
     {"focus_previous_pane", "Focus Previous Pane"},
     {"focus_left_pane", "Focus Left Pane"},
     {"focus_right_pane", "Focus Right Pane"},
+    {"focus_up_pane", "Focus Top Pane"},
+    {"focus_down_pane", "Focus Bottom Pane"},
+    {"toggle_split_orientation", "Toggle Split Orientation"},
     {"grid_view", "Grid View"},
     {"miller_view", "Miller View"},
     {"detailed_view", "Detailed View"},
@@ -184,6 +187,9 @@ QMap<QString, QString> ConfigManager::s_defaultShortcuts = {
     {"focus_previous_pane", "Shift+F6"},
     {"focus_left_pane", "Ctrl+Alt+Left"},
     {"focus_right_pane", "Ctrl+Alt+Right"},
+    {"focus_up_pane", "Ctrl+Alt+Up"},
+    {"focus_down_pane", "Ctrl+Alt+Down"},
+    {"toggle_split_orientation", "Ctrl+Shift+O"},
     {"grid_view", "Ctrl+1"},
     {"miller_view", "Ctrl+2"},
     {"detailed_view", "Ctrl+3"},
@@ -296,6 +302,7 @@ void ConfigManager::setDefaults()
     m_iconThemeFallback = QStringLiteral("Adwaita");
     m_fontFamily.clear();
     m_defaultView = "grid";
+    m_splitOrientation = QStringLiteral("vertical");
     m_showHidden = false;
     m_hiddenLast = false;
     m_rightClickToEditPath = true;
@@ -366,6 +373,13 @@ void ConfigManager::loadConfig()
             m_fontFamily = QString::fromStdString(*v);
         if (auto v = config["general"]["default_view"].value<std::string>())
             m_defaultView = QString::fromStdString(*v);
+        if (auto v = config["general"]["split_orientation"].value<std::string>()) {
+            QString val = QString::fromStdString(*v).trimmed().toLower();
+            if (val == QLatin1String("horizontal") || val == QLatin1String("horiz") || val == QLatin1String("top_bottom"))
+                m_splitOrientation = QStringLiteral("horizontal");
+            else
+                m_splitOrientation = QStringLiteral("vertical");
+        }
         if (auto v = config["general"]["show_hidden"].value<bool>())
             m_showHidden = *v;
         if (auto v = config["general"]["hidden_last"].value<bool>())
@@ -605,6 +619,9 @@ font_family = ""
 # View for new tabs: "grid" | "detailed" | "miller"
 default_view = "grid"
 
+# Split view orientation when opening a folder in split: "vertical" | "horizontal"
+split_orientation = "vertical"
+
 show_hidden = false
 
 # Sort hidden files after the others (folders and files each keep their own
@@ -749,6 +766,9 @@ current_fraction = 0.5
 # focus_previous_pane = "Shift+F6"
 # focus_left_pane   = "Ctrl+Alt+Left"
 # focus_right_pane  = "Ctrl+Alt+Right"
+# focus_up_pane     = "Ctrl+Alt+Up"
+# focus_down_pane   = "Ctrl+Alt+Down"
+# toggle_split_orientation = "Ctrl+Shift+O"
 # grid_view         = "Ctrl+1"
 # miller_view       = "Ctrl+2"
 # detailed_view     = "Ctrl+3"
@@ -875,6 +895,7 @@ void ConfigManager::setIconThemeFallback(const QString &theme)
 }
 QString ConfigManager::fontFamily() const { return m_fontFamily; }
 QString ConfigManager::defaultView() const { return m_defaultView; }
+QString ConfigManager::splitOrientation() const { return m_splitOrientation; }
 bool ConfigManager::showHidden() const { return m_showHidden; }
 
 bool ConfigManager::hiddenLast() const { return m_hiddenLast; }
@@ -1114,6 +1135,14 @@ void ConfigManager::saveSettings(const QVariantMap &settings)
     if (settings.contains("fontFamily")) {
         m_fontFamily = settings.value("fontFamily").toString().trimmed();
         general.insert_or_assign("font_family", m_fontFamily.toStdString());
+    }
+
+    if (settings.contains("splitOrientation")) {
+        const QString splitOrientation = settings.value("splitOrientation").toString().trimmed().toLower();
+        if (splitOrientation == QLatin1String("horizontal") || splitOrientation == QLatin1String("vertical")) {
+            m_splitOrientation = splitOrientation;
+            general.insert_or_assign("split_orientation", splitOrientation.toStdString());
+        }
     }
 
     if (settings.contains("showHidden")) {

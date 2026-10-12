@@ -278,6 +278,18 @@ ApplicationWindow {
         return tabModel.activeTab ? tabModel.activeTab.splitViewEnabled : false
     }
 
+    readonly property bool isSplitHorizontal: {
+        var orient = (tabModel.activeTab && tabModel.activeTab.splitOrientation)
+            ? tabModel.activeTab.splitOrientation
+            : (config.splitOrientation || "vertical")
+        return orient.toLowerCase() === "horizontal"
+    }
+
+    function toggleSplitOrientation() {
+        if (!tabModel.activeTab) return
+        tabModel.activeTab.toggleSplitOrientation()
+    }
+
     function paneBaseModel(pane) {
         return pane === "secondary" ? splitFsModel : fsModel
     }
@@ -3413,6 +3425,25 @@ ApplicationWindow {
     }
 
     Shortcut {
+        sequence: config.shortcutMap["focus_up_pane"]
+        onActivated: {
+            if (root.isSplitHorizontal) root.setActivePane("primary")
+        }
+    }
+
+    Shortcut {
+        sequence: config.shortcutMap["focus_down_pane"]
+        onActivated: {
+            if (root.isSplitHorizontal) root.setActivePane("secondary")
+        }
+    }
+
+    Shortcut {
+        sequence: config.shortcutMap["toggle_split_orientation"]
+        onActivated: root.toggleSplitOrientation()
+    }
+
+    Shortcut {
         sequence: config.shortcutMap["focus_next_pane"]
         onActivated: root.focusNextPane()
     }
@@ -3958,6 +3989,7 @@ ApplicationWindow {
                 canGoBack: activePaneCanGoBack()
                 canGoForward: activePaneCanGoForward()
                 splitViewEnabled: root.splitViewEnabled()
+                isSplitHorizontal: root.isSplitHorizontal
                 isRecentsView: root.isRecentsView
                 isTrashView: root.isTrashView
                 isRemoteView: root.isRemoteView
@@ -3993,6 +4025,7 @@ ApplicationWindow {
                 }
                 onEmptyTrashRequested: root.openDialog(emptyTrashConfirmDialogLoader)
                 onSplitViewToggled: root.toggleSplitView()
+                onSplitOrientationToggled: root.toggleSplitOrientation()
                 onHomeClicked: {
                     root.navigateActivePaneTo(fsModel.homePath())
                 }
@@ -4055,17 +4088,25 @@ ApplicationWindow {
                     }
                 }
 
-                RowLayout {
+                GridLayout {
                     id: paneRow
                     anchors.fill: parent
                     anchors.margins: 8 * root.splitTransitionProgress
-                    spacing: 8 * root.splitTransitionProgress
+                    readonly property real spacing: 8 * root.splitTransitionProgress
+                    rowSpacing: spacing
+                    columnSpacing: spacing
+                    columns: root.isSplitHorizontal ? 1 : 3
+                    rows: root.isSplitHorizontal ? 3 : 1
 
                     readonly property real dividerWidth: root.splitTransitionProgress
-                    readonly property real secondaryPreferredWidth: Math.max(
+                    readonly property real secondaryPreferredWidth: root.isSplitHorizontal ? -1 : Math.max(
                         0,
                         (width - spacing - dividerWidth) * 0.5 * root.splitTransitionProgress
                     )
+                    readonly property real secondaryPreferredHeight: root.isSplitHorizontal ? Math.max(
+                        0,
+                        (height - spacing - dividerWidth) * 0.5 * root.splitTransitionProgress
+                    ) : -1
 
                     Rectangle {
                         id: primaryPaneFrame
@@ -4134,12 +4175,14 @@ ApplicationWindow {
                         id: dividerLoader
                         active: root.splitViewPresented
                         visible: active
-                        Layout.preferredWidth: paneRow.dividerWidth
-                        Layout.fillHeight: true
+                        Layout.preferredWidth: root.isSplitHorizontal ? -1 : paneRow.dividerWidth
+                        Layout.preferredHeight: root.isSplitHorizontal ? paneRow.dividerWidth : -1
+                        Layout.fillWidth: root.isSplitHorizontal
+                        Layout.fillHeight: !root.isSplitHorizontal
                         opacity: root.splitTransitionProgress
 
                         sourceComponent: Rectangle {
-                            width: 1
+                            anchors.fill: parent
                             color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.08)
                         }
                     }
@@ -4151,14 +4194,16 @@ ApplicationWindow {
                         enabled: root.splitViewEnabled()
                         opacity: root.splitTransitionProgress
                         Layout.preferredWidth: paneRow.secondaryPreferredWidth
-                        Layout.fillHeight: true
+                        Layout.preferredHeight: paneRow.secondaryPreferredHeight
+                        Layout.fillWidth: true
+                        Layout.fillHeight: !root.isSplitHorizontal
 
                         sourceComponent: Rectangle {
                             id: secondaryPaneFrame
                             property alias fileView: secondaryFileViewContainer
                             opacity: root.splitTransitionProgress
                             scale: 0.96 + (0.04 * root.splitTransitionProgress)
-                            transformOrigin: Item.Right
+                            transformOrigin: root.isSplitHorizontal ? Item.Bottom : Item.Right
                             radius: Theme.radiusMedium
                             clip: true
                             color: Theme.containerColor(Theme.crust, 0.14)
