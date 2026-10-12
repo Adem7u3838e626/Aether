@@ -1,6 +1,7 @@
 #include <QDir>
 #include <QFile>
 #include <QProcess>
+#include <QSet>
 #include <QSignalSpy>
 #include <QStandardPaths>
 #include <QTemporaryDir>
@@ -13,19 +14,27 @@
 
 namespace {
 
+// What `du --apparent-size -sb` reports on coreutils 9: every non-directory
+// once per inode, directories as 0. coreutils 8 (Ubuntu 22.04) adds each
+// directory's own st_size too, so du itself cannot be the reference.
 qint64 duApparentSize(const QStringList &paths)
 {
     QProcess proc;
-    QStringList args = {QStringLiteral("--apparent-size"), QStringLiteral("-sb")};
-    args.append(paths);
-    proc.start(QStringLiteral("du"), args);
+    proc.start(QStringLiteral("find"),
+               paths + QStringList{QStringLiteral("!"), QStringLiteral("-type"), QStringLiteral("d"),
+                                   QStringLiteral("-printf"), QStringLiteral("%D:%i %s\\n")});
     if (!proc.waitForFinished(5000) || proc.exitCode() != 0)
         return -1;
 
     qint64 total = 0;
+    QSet<QString> seen;
     const QStringList lines = QString::fromUtf8(proc.readAllStandardOutput()).split('\n', Qt::SkipEmptyParts);
-    for (const QString &line : lines)
-        total += line.section('\t', 0, 0).toLongLong();
+    for (const QString &line : lines) {
+        if (!seen.contains(line.section(' ', 0, 0))) {
+            seen.insert(line.section(' ', 0, 0));
+            total += line.section(' ', 1, 1).toLongLong();
+        }
+    }
     return total;
 }
 
