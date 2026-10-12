@@ -21,9 +21,17 @@ cleanup() {
 PIDS=()
 trap cleanup EXIT
 
-# QLocalServer names the instance socket per-uid inside QDir::tempPath(), which
-# follows TMPDIR. Pointing TMPDIR at the sandbox keeps any HyprFM the developer
-# is running on its own socket, so it never takes part in these handoffs.
+# The instance socket lives in the runtime directory. Pointing XDG_RUNTIME_DIR
+# at the sandbox keeps any HyprFM the developer is running on its own socket,
+# so it never takes part in these handoffs. The Wayland and Hyprland sockets
+# stay in the real one: WAYLAND_DISPLAY may be an absolute path.
+REAL_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+case "${WAYLAND_DISPLAY:-}" in
+    ""|/*) ;;
+    *) export WAYLAND_DISPLAY="$REAL_RUNTIME_DIR/$WAYLAND_DISPLAY" ;;
+esac
+export XDG_RUNTIME_DIR="$SANDBOX/run"
+mkdir -p -m 700 "$XDG_RUNTIME_DIR"
 export TMPDIR="$SANDBOX/tmp"
 mkdir -p "$TMPDIR"
 
@@ -34,7 +42,7 @@ export XDG_CONFIG_HOME="$HOME/.config"
 export XDG_CACHE_HOME="$HOME/.cache"
 mkdir -p "$HOME/.config/hyprfm"
 SESSION="$HOME/.config/hyprfm/session.json"
-SOCKET="$TMPDIR/hyprfm-$(id -u)"
+SOCKET="$XDG_RUNTIME_DIR/hyprfm.sock"
 
 failures=0
 
@@ -95,11 +103,11 @@ check "handoff added a tab to the primary" \
 # Windows are counted through Hyprland when it is the compositor; elsewhere the
 # window checks are skipped and only the handoff itself is checked.
 hypr_sig=${HYPRLAND_INSTANCE_SIGNATURE:-}
-[ -n "$hypr_sig" ] && [ -S "$XDG_RUNTIME_DIR/hypr/$hypr_sig/.socket.sock" ] \
-    || hypr_sig=$(ls -t "$XDG_RUNTIME_DIR/hypr" 2>/dev/null | head -1)
+[ -n "$hypr_sig" ] && [ -S "$REAL_RUNTIME_DIR/hypr/$hypr_sig/.socket.sock" ] \
+    || hypr_sig=$(ls -t "$REAL_RUNTIME_DIR/hypr" 2>/dev/null | head -1)
 windows_of() {
     [ -n "$hypr_sig" ] && command -v hyprctl >/dev/null || { echo "?"; return; }
-    HYPRLAND_INSTANCE_SIGNATURE=$hypr_sig hyprctl -j clients 2>/dev/null \
+    XDG_RUNTIME_DIR=$REAL_RUNTIME_DIR HYPRLAND_INSTANCE_SIGNATURE=$hypr_sig hyprctl -j clients 2>/dev/null \
         | grep -o "\"pid\": $1," | wc -l
 }
 more_windows_than() { [ "$(windows_of "$primary")" != "?" ] && [ "$(windows_of "$primary")" -gt "$1" ]; }

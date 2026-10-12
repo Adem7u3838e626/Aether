@@ -728,7 +728,14 @@ int main(int argc, char *argv[])
     // The process that manages to listen on the socket is the "primary" one:
     // it answers those handoffs and owns the saved session (tabs + geometry)
     // of its first window.
-    const QString hyprfmSocketName = QStringLiteral("hyprfm-%1").arg(static_cast<uint>(getuid()));
+    //
+    // The socket lives in the runtime directory ($XDG_RUNTIME_DIR, or Qt's own
+    // 0700 fallback), which only this user can write to. It used to be
+    // /tmp/hyprfm-<uid>: any local user could create that first, and every
+    // launch would then hand its path to their server and quit.
+    const QString hyprfmSocketName =
+        QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation)
+        + QStringLiteral("/hyprfm.sock");
     QLocalServer *ipcServer = nullptr;
     bool isPrimary = false;
     {
