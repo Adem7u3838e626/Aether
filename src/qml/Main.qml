@@ -669,6 +669,8 @@ ApplicationWindow {
     }
 
     function navigateActivePaneTo(path) {
+        if (tabModel.activeTab && path === fsModel.homePath() && splitViewEnabled())
+            root.toggleSplitView()
         navigatePaneTo(activePane, path)
     }
 
@@ -919,6 +921,61 @@ ApplicationWindow {
         }
 
         tabModel.activeTab.splitViewEnabled = enable
+        root.updateSelectionStatus()
+    }
+
+    function saveCurrentSplit() {
+        if (!tabModel.activeTab || !tabModel.activeTab.splitViewEnabled)
+            return
+
+        var tab = tabModel.activeTab
+        root.saveSplitPaths(tab.currentPath, tab.secondaryCurrentPath,
+                            tab.splitOrientation || config.splitOrientation || "vertical")
+    }
+
+    function saveSplitPaths(primaryPath, secondaryPath, orientation) {
+        if (!primaryPath || !secondaryPath || primaryPath === secondaryPath)
+            return
+
+        var name = pathDisplayName(primaryPath) + " + " + pathDisplayName(secondaryPath)
+        var splits = config.savedSplits.slice()
+        splits.push({
+            name: name,
+            primaryPath: primaryPath,
+            secondaryPath: secondaryPath,
+            orientation: (orientation || "vertical").toLowerCase()
+        })
+        config.saveSavedSplits(splits)
+        toast.show("Split saved to sidebar — right-click it there to remove", "info")
+    }
+
+    function saveSelectedFolders(paths) {
+        if (!paths || paths.length !== 2)
+            return
+
+        var orientation = tabModel.activeTab && tabModel.activeTab.splitViewEnabled
+            ? tabModel.activeTab.splitOrientation
+            : config.splitOrientation
+        root.saveSplitPaths(paths[0], paths[1], orientation)
+    }
+
+    function removeSavedSplit(index) {
+        var splits = config.savedSplits.slice()
+        if (index < 0 || index >= splits.length)
+            return
+        splits.splice(index, 1)
+        config.saveSavedSplits(splits)
+    }
+
+    function restoreSavedSplit(split) {
+        if (!tabModel.activeTab || !split)
+            return
+
+        var tab = tabModel.activeTab
+        tab.splitViewEnabled = true
+        tab.splitOrientation = (split.orientation || config.splitOrientation || "vertical").toLowerCase()
+        tab.navigateTo(split.primaryPath)
+        tab.resetSecondaryTo(split.secondaryPath)
         root.updateSelectionStatus()
     }
 
@@ -3136,6 +3193,7 @@ ApplicationWindow {
                 }
                 onRestoreRequested: (paths) => fileOps.restoreFromTrash(paths)
                 onEmptyTrashRequested: root.openDialog(emptyTrashConfirmDialogLoader)
+                onMergeFoldersRequested: (paths) => root.saveSelectedFolders(paths)
 
                 onDeleteRequested: (paths) => {
                     deleteConfirmPaths = paths
@@ -3224,7 +3282,15 @@ ApplicationWindow {
                 }
 
                 onCustomActionRequested: (action) => {
-                    if (action === "emptytrash") {
+                    if (action === "bookmark_saved_split") {
+                        if (sidebarItem.primaryPath && sidebarItem.secondaryPath) {
+                            bookmarks.addBookmark(sidebarItem.primaryPath)
+                            bookmarks.addBookmark(sidebarItem.secondaryPath)
+                            toast.show("Both folders added to bookmarks", "info")
+                        }
+                    } else if (action === "remove_saved_split") {
+                        root.removeSavedSplit(sidebarItem.index)
+                    } else if (action === "emptytrash") {
                         root.openDialog(emptyTrashConfirmDialogLoader)
                     } else if (action === "renamebookmark") {
                         if (sidebarItem.kind === "bookmark" && sidebarItem.index >= 0)
@@ -3702,6 +3768,14 @@ ApplicationWindow {
             ]
         }
 
+        if (item.kind === "savedSplit") {
+            return [
+                { text: "Add Both Folders to Bookmarks", shortcut: "", action: "bookmark_saved_split", icon: "Bookmark" },
+                { separator: true },
+                { text: "Remove Saved Split", shortcut: "", action: "remove_saved_split", destructive: true }
+            ]
+        }
+
         if (item.kind === "device") {
             if (!item.mounted)
                 return [
@@ -3821,6 +3895,11 @@ ApplicationWindow {
         menu.isEmptySpace = (filePath === "")
         var sel = getSelectedPaths(pane)
         menu.selectedPaths = (sel.length > 1) ? sel : (filePath !== "" ? [filePath] : [])
+        var selectedItems = getSelectedItems(pane)
+        menu.selectedFolderPaths = selectedItems.length === 2
+                && selectedItems[0].isDir && selectedItems[1].isDir
+            ? [selectedItems[0].path, selectedItems[1].path]
+            : []
         menu.popup(position.x, position.y)
     }
 
@@ -3893,6 +3972,9 @@ ApplicationWindow {
                     onBookmarkClicked: (path) => {
                         root.navigateActivePaneTo(path)
                     }
+                    onSavedSplitClicked: (split) => {
+                        root.restoreSavedSplit(split)
+                    }
                     onRenamingBookmarkIndexChanged: {
                         if (renamingBookmarkIndex < 0)
                             root.scheduleActivePaneFocus()
@@ -3907,6 +3989,7 @@ ApplicationWindow {
                         menu.targetIsDir = !!item.path
                         menu.isEmptySpace = false
                         menu.selectedPaths = item.path ? [item.path] : []
+                        menu.selectedFolderPaths = []
                         menu.popup(position.x, position.y)
                     }
                     onRecentsClicked: {
@@ -4026,6 +4109,7 @@ ApplicationWindow {
                 onEmptyTrashRequested: root.openDialog(emptyTrashConfirmDialogLoader)
                 onSplitViewToggled: root.toggleSplitView()
                 onSplitOrientationToggled: root.toggleSplitOrientation()
+                onSplitSaved: root.saveCurrentSplit()
                 onHomeClicked: {
                     root.navigateActivePaneTo(fsModel.homePath())
                 }

@@ -492,6 +492,25 @@ void ConfigManager::loadConfig()
             }
         }
 
+        m_savedSplits.clear();
+        if (auto arr = config["saved_splits"]["splits"].as_array()) {
+            for (const auto &item : *arr) {
+                if (auto tbl = item.as_table()) {
+                    QVariantMap split;
+                    if (auto v = (*tbl)["name"].value<std::string>())
+                        split.insert("name", QString::fromStdString(*v));
+                    if (auto v = (*tbl)["primaryPath"].value<std::string>())
+                        split.insert("primaryPath", QString::fromStdString(*v));
+                    if (auto v = (*tbl)["secondaryPath"].value<std::string>())
+                        split.insert("secondaryPath", QString::fromStdString(*v));
+                    if (auto v = (*tbl)["orientation"].value<std::string>())
+                        split.insert("orientation", QString::fromStdString(*v));
+                    if (split.contains("primaryPath") && split.contains("secondaryPath"))
+                        m_savedSplits.append(split);
+                }
+            }
+        }
+
         m_customContextActions.clear();
         if (auto arr = config["context_menu"]["actions"].as_array()) {
             for (const auto &item : *arr) {
@@ -711,6 +730,13 @@ current_fraction = 0.5
 # and choose "Rename" to set one in-app.
 # names = { "~/Projects" = "Work" }
 
+[saved_splits]
+# Saved split views. Reopen both panes of a split layout with one click.
+# Each entry: name, primaryPath, secondaryPath, orientation ("vertical"|"horizontal").
+# splits = [
+#     { name = "Codici - Flowchart", primaryPath = "~/Codici", secondaryPath = "~/Flowchart", orientation = "vertical" }
+# ]
+
 [context_menu]
 # Extra entries at the bottom of a file's or folder's right-click menu.
 # `command` takes desktop-entry field codes (%f or %u = the item's path) and runs once
@@ -911,6 +937,7 @@ bool ConfigManager::sidebarVisible() const { return m_sidebarVisible; }
 int ConfigManager::sidebarAutoHideWidth() const { return m_sidebarAutoHideWidth; }
 QStringList ConfigManager::hiddenQuickAccess() const { return m_hiddenQuickAccess; }
 QStringList ConfigManager::bookmarks() const { return m_bookmarks; }
+QVariantList ConfigManager::savedSplits() const { return m_savedSplits; }
 QVariantMap ConfigManager::bookmarkNames() const { return m_bookmarkNames; }
 int ConfigManager::radiusSmall() const { return m_radiusSmall; }
 int ConfigManager::radiusMedium() const { return m_radiusMedium; }
@@ -1502,6 +1529,47 @@ void ConfigManager::saveBookmarks(const QStringList &paths, const QVariantMap &n
         m_configModified = QFileInfo(m_configPath).lastModified();
         m_watcher.addPath(m_configPath);
     }
+}
+
+void ConfigManager::saveSavedSplits(const QVariantList &splits)
+{
+    m_savedSplits = splits;
+
+    const bool wasWatchingConfig = m_watcher.files().contains(m_configPath);
+    if (wasWatchingConfig)
+        m_watcher.removePath(m_configPath);
+
+    toml::table config;
+    if (QFile::exists(m_configPath)) {
+        try {
+            config = toml::parse_file(m_configPath.toStdString());
+        } catch (...) {}
+    }
+
+    toml::array arr;
+    for (const auto &splitVar : splits) {
+        const QVariantMap split = splitVar.toMap();
+        toml::table entry;
+        if (const auto name = split.value("name").toString(); !name.isEmpty())
+            entry.insert_or_assign("name", name.toStdString());
+        if (const auto primary = split.value("primaryPath").toString(); !primary.isEmpty())
+            entry.insert_or_assign("primaryPath", primary.toStdString());
+        if (const auto secondary = split.value("secondaryPath").toString(); !secondary.isEmpty())
+            entry.insert_or_assign("secondaryPath", secondary.toStdString());
+        if (const auto orientation = split.value("orientation").toString(); !orientation.isEmpty())
+            entry.insert_or_assign("orientation", orientation.toStdString());
+        arr.push_back(std::move(entry));
+    }
+    config.insert_or_assign("saved_splits", toml::table{{"splits", std::move(arr)}});
+
+    writeConfigDocument(m_configPath, config);
+
+    if (QFile::exists(m_configPath)) {
+        m_configModified = QFileInfo(m_configPath).lastModified();
+        m_watcher.addPath(m_configPath);
+    }
+
+    emit savedSplitsChanged();
 }
 
 void ConfigManager::saveSidebarWidth(int width)
