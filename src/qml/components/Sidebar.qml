@@ -714,6 +714,15 @@ Rectangle {
             }
         }
 
+        Rectangle {
+            visible: savedSplitsList.count > 0
+            Layout.fillWidth: true
+            Layout.leftMargin: Theme.spacing
+            Layout.rightMargin: Theme.spacing
+            height: 1
+            color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.08)
+        }
+
         // Auto-navigate after mounting an unmounted device
         Connections {
             target: devices
