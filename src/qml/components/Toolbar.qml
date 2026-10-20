@@ -364,13 +364,10 @@ Rectangle {
                         ? Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.1)
                         : "transparent"
                     onClicked: root.splitSaved()
-                    Loader {
+                    IconBookmark {
                         anchors.centerIn: parent
-                        source: "../icons/IconBookmark.qml"
-                        onLoaded: {
-                            item.size = 18
-                            item.color = Qt.binding(() => hovered ? Theme.accent : Theme.subtext)
-                        }
+                        size: 18
+                        color: parent.hovered ? Theme.accent : Theme.subtext
                     }
                 }
 
