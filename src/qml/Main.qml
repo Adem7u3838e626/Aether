@@ -4197,6 +4197,7 @@ ApplicationWindow {
 
                     Rectangle {
                         id: primaryPaneFrame
+                        objectName: "primaryPaneFrame"
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         radius: Theme.radiusMedium * root.splitTransitionProgress
@@ -4276,13 +4277,16 @@ ApplicationWindow {
 
                     Loader {
                         id: secondaryPaneLoader
+                        objectName: "secondaryPaneLoader"
                         active: root.splitViewPresented
                         visible: active
                         enabled: root.splitViewEnabled()
                         opacity: root.splitTransitionProgress
                         Layout.preferredWidth: paneRow.secondaryPreferredWidth
                         Layout.preferredHeight: paneRow.secondaryPreferredHeight
-                        Layout.fillWidth: true
+                        // Only the primary pane fills along the split axis;
+                        // filling here too collapsed it in the vertical split.
+                        Layout.fillWidth: root.isSplitHorizontal
                         Layout.fillHeight: !root.isSplitHorizontal
 
                         sourceComponent: Rectangle {

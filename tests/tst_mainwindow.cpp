@@ -634,6 +634,34 @@ private slots:
                                                  : focused->objectName())));
     }
 
+    // Both panes get about half the space in either orientation. The
+    // horizontal-split change once let the secondary pane fill the width
+    // too, which squeezed the primary pane to a sliver in a vertical split.
+    void testSplitPanesShareTheSpace()
+    {
+        App app;
+        QVERIFY(app.load());
+        app.window->resize(1100, 700);
+        QObject *root = app.window->contentItem()->parent();
+        QVERIFY(QMetaObject::invokeMethod(root, "toggleSplitView"));
+        auto *primary = app.window->findChild<QQuickItem *>("primaryPaneFrame");
+        auto *secondary = app.window->findChild<QQuickItem *>("secondaryPaneLoader");
+        QVERIFY(primary && secondary);
+
+        auto halves = [](qreal a, qreal b) { return qAbs(a - b) < 0.1 * (a + b); };
+        // Mid-animation the widths cross, so only judge the settled layout.
+        QTRY_COMPARE(root->property("splitTransitionProgress").toReal(), 1.0);
+        app.window->grabWindow();   // offscreen layouts only polish on a render
+        QVERIFY(halves(primary->width(), secondary->width()));
+        QVERIFY(primary->x() < secondary->x());
+
+        QVERIFY(QMetaObject::invokeMethod(root, "toggleSplitOrientation"));
+        app.window->grabWindow();
+        QTRY_VERIFY(primary->y() < secondary->y());
+        QVERIFY(halves(primary->height(), secondary->height()));
+        QCOMPARE(primary->width(), secondary->width());
+    }
+
     // A tab with no orientation of its own follows split_orientation, so the
     // first toggle has to flip that, not blindly pick "horizontal".
     void testToggleSplitOrientationFromConfigDefault()
