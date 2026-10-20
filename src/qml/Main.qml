@@ -929,21 +929,28 @@ ApplicationWindow {
             return
 
         var tab = tabModel.activeTab
-        root.saveSplitPaths(tab.currentPath, tab.secondaryCurrentPath,
-                            tab.splitOrientation || config.splitOrientation || "vertical")
+        root.saveSplitPaths(tab.currentPath, tab.secondaryCurrentPath)
     }
 
-    function saveSplitPaths(primaryPath, secondaryPath, orientation) {
+    function saveSplitPaths(primaryPath, secondaryPath) {
         if (!primaryPath || !secondaryPath || primaryPath === secondaryPath)
             return
+        var orientation = root.isSplitHorizontal ? "horizontal" : "vertical"
+        var splits = config.savedSplits.slice()
+        for (var i = 0; i < splits.length; ++i) {
+            if (splits[i].primaryPath === primaryPath && splits[i].secondaryPath === secondaryPath
+                    && splits[i].orientation === orientation) {
+                toast.show("This split is already in the sidebar", "info")
+                return
+            }
+        }
 
         var name = pathDisplayName(primaryPath) + " + " + pathDisplayName(secondaryPath)
-        var splits = config.savedSplits.slice()
         splits.push({
             name: name,
             primaryPath: primaryPath,
             secondaryPath: secondaryPath,
-            orientation: (orientation || "vertical").toLowerCase()
+            orientation: orientation
         })
         config.saveSavedSplits(splits)
         toast.show("Split saved to sidebar — right-click it there to remove", "info")
@@ -952,11 +959,7 @@ ApplicationWindow {
     function saveSelectedFolders(paths) {
         if (!paths || paths.length !== 2)
             return
-
-        var orientation = tabModel.activeTab && tabModel.activeTab.splitViewEnabled
-            ? tabModel.activeTab.splitOrientation
-            : config.splitOrientation
-        root.saveSplitPaths(paths[0], paths[1], orientation)
+        root.saveSplitPaths(paths[0], paths[1])
     }
 
     function removeSavedSplit(index) {
@@ -3193,7 +3196,7 @@ ApplicationWindow {
                 }
                 onRestoreRequested: (paths) => fileOps.restoreFromTrash(paths)
                 onEmptyTrashRequested: root.openDialog(emptyTrashConfirmDialogLoader)
-                onMergeFoldersRequested: (paths) => root.saveSelectedFolders(paths)
+                onSaveSplitRequested: (paths) => root.saveSelectedFolders(paths)
 
                 onDeleteRequested: (paths) => {
                     deleteConfirmPaths = paths

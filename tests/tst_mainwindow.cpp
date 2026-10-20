@@ -653,7 +653,7 @@ private slots:
         QVERIFY(!root->property("isSplitHorizontal").toBool());
     }
 
-    void testMergingTwoSelectedFoldersAddsSavedSplit()
+    void testSavingTwoSelectedFoldersAsSplit()
     {
         App app;
         QVERIFY(app.load());
@@ -671,11 +671,11 @@ private slots:
         QVERIFY(QMetaObject::invokeMethod(menu, "buildModel", Q_RETURN_ARG(QVariant, modelResult)));
         const QVariantList items = modelResult.toList();
         QVERIFY(std::any_of(items.cbegin(), items.cend(), [](const QVariant &entry) {
-            return entry.toMap().value("action").toString() == "merge_folders";
+            return entry.toMap().value("action").toString() == "save_split";
         }));
 
         QVERIFY(QMetaObject::invokeMethod(menu, "executeAction",
-                                          Q_ARG(QVariant, QStringLiteral("merge_folders")),
+                                          Q_ARG(QVariant, QStringLiteral("save_split")),
                                           Q_ARG(QVariant, QVariant()),
                                           Q_ARG(QVariant, QVariant())));
         auto *config = app.engine.rootContext()->contextProperty("config").value<QObject *>();
@@ -684,6 +684,13 @@ private slots:
         QCOMPARE(saved.size(), 1);
         QCOMPARE(saved.first().toMap().value("primaryPath").toString(), first);
         QCOMPARE(saved.first().toMap().value("secondaryPath").toString(), second);
+
+        // Saving the same pair again does not add a duplicate.
+        QVERIFY(QMetaObject::invokeMethod(menu, "executeAction",
+                                          Q_ARG(QVariant, QStringLiteral("save_split")),
+                                          Q_ARG(QVariant, QVariant()),
+                                          Q_ARG(QVariant, QVariant())));
+        QCOMPARE(config->property("savedSplits").toList().size(), 1);
     }
 
     void testSavedSplitContextMenuCanBookmarkBothFolders()

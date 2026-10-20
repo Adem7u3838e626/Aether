@@ -47,7 +47,7 @@ Item {
     signal viewModeRequested(string mode)
     signal sortRequested(string column, bool ascending)
     signal emptyTrashRequested()
-    signal mergeFoldersRequested(var paths)
+    signal saveSplitRequested(var paths)
     signal customActionRequested(string action)
     signal customActionRunRequested(string name, string command, var paths)
 
@@ -653,7 +653,7 @@ Item {
                 && !isTrashView
                 && !fileOps.isRemotePath(selectedFolderPaths[0])
                 && !fileOps.isRemotePath(selectedFolderPaths[1])) {
-            items.push({ text: "Merge These Two Folders", shortcut: "", action: "merge_folders", icon: "SquareSplitHorizontal" })
+            items.push({ text: "Save as Split View", shortcut: "", action: "save_split", icon: "SquareSplitHorizontal" })
             items.push({ separator: true })
         }
         if (!isEmptySpace && targetPath !== "") {
@@ -847,7 +847,7 @@ Item {
         case "extract_to": fileOps.extractArchiveTo(targetPath); break
         case "setwallpaper": fileOps.setWallpaper(targetPath); break
         case "emptytrash": emptyTrashRequested(); break
-        case "merge_folders": mergeFoldersRequested(selectedFolderPaths); break
+        case "save_split": saveSplitRequested(selectedFolderPaths); break
         default:
             if (action.startsWith("custom:")) {
                 var custom = config.customContextActions[parseInt(action.slice(7))]
