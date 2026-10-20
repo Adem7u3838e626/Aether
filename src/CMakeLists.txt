@@ -132,6 +132,7 @@ list(APPEND hyprfm_qml_module_args
         qml/icons/IconSearch.qml
         qml/icons/IconPanelLeft.qml
         qml/icons/IconSquareSplitHorizontal.qml
+        qml/icons/IconBookmark.qml
         qml/icons/IconPlus.qml
         qml/icons/IconClock.qml
         qml/icons/IconTrash.qml

@@ -17,6 +17,7 @@ Item {
     property bool targetIsDir: false
     property bool isEmptySpace: false
     property var selectedPaths: []
+    property var selectedFolderPaths: []
     property var customItems: []
     property var contextData: ({})
     property int menuWidth: 260
@@ -46,6 +47,7 @@ Item {
     signal viewModeRequested(string mode)
     signal sortRequested(string column, bool ascending)
     signal emptyTrashRequested()
+    signal saveSplitRequested(var paths)
     signal customActionRequested(string action)
     signal customActionRunRequested(string name, string command, var paths)
 
@@ -647,6 +649,13 @@ Item {
         if (hasCustomItems) {
             return customItems
         }
+        if (selectedFolderPaths.length === 2
+                && !isTrashView
+                && !fileOps.isRemotePath(selectedFolderPaths[0])
+                && !fileOps.isRemotePath(selectedFolderPaths[1])) {
+            items.push({ text: "Save as Split View", shortcut: "", action: "save_split", icon: "SquareSplitHorizontal" })
+            items.push({ separator: true })
+        }
         if (!isEmptySpace && targetPath !== "") {
             items.push({ text: "Open", shortcut: config.shortcutMap["open"] || "Return", action: "open", icon: "ExternalLink" })
             if (targetIsDir)
@@ -769,8 +778,10 @@ Item {
                 }
                 if (!splitViewEnabled)
                     items.push({ text: "Split View Here", shortcut: "", action: "split_here", icon: "SquareSplitHorizontal" })
-                else
+                else {
                     items.push({ text: "Close Split View", shortcut: "", action: "close_split", icon: "SquareSplitHorizontal" })
+                    items.push({ text: "Save Split to Sidebar", shortcut: "", action: "save_current_split", icon: "Bookmark" })
+                }
                 items.push({ separator: true })
                 if (!remoteContext)
                     items.push({ text: "Open in Terminal", shortcut: "", action: "terminal", icon: "Terminal" })
@@ -811,6 +822,7 @@ Item {
         case "split_open": splitViewRequested(targetPath); break
         case "split_here": splitViewRequested(effectiveDir); break
         case "close_split": customActionRequested("close_split"); break
+        case "save_current_split": customActionRequested("save_current_split"); break
         case "view_grid": viewModeRequested("grid"); break
         case "view_miller": viewModeRequested("miller"); break
         case "view_detailed": viewModeRequested("detailed"); break
@@ -838,6 +850,7 @@ Item {
         case "extract_to": fileOps.extractArchiveTo(targetPath); break
         case "setwallpaper": fileOps.setWallpaper(targetPath); break
         case "emptytrash": emptyTrashRequested(); break
+        case "save_split": saveSplitRequested(selectedFolderPaths); break
         default:
             if (action.startsWith("custom:")) {
                 var custom = config.customContextActions[parseInt(action.slice(7))]

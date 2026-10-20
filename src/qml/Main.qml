@@ -278,6 +278,20 @@ ApplicationWindow {
         return tabModel.activeTab ? tabModel.activeTab.splitViewEnabled : false
     }
 
+    readonly property bool isSplitHorizontal: {
+        var orient = (tabModel.activeTab && tabModel.activeTab.splitOrientation)
+            ? tabModel.activeTab.splitOrientation
+            : (config.splitOrientation || "vertical")
+        return orient.toLowerCase() === "horizontal"
+    }
+
+    function toggleSplitOrientation() {
+        if (!tabModel.activeTab) return
+        // From the effective orientation: a tab with none set follows the
+        // config default, which may already be horizontal.
+        tabModel.activeTab.splitOrientation = root.isSplitHorizontal ? "vertical" : "horizontal"
+    }
+
     function paneBaseModel(pane) {
         return pane === "secondary" ? splitFsModel : fsModel
     }
@@ -907,6 +921,64 @@ ApplicationWindow {
         }
 
         tabModel.activeTab.splitViewEnabled = enable
+        root.updateSelectionStatus()
+    }
+
+    function saveCurrentSplit() {
+        if (!tabModel.activeTab || !tabModel.activeTab.splitViewEnabled)
+            return
+
+        var tab = tabModel.activeTab
+        root.saveSplitPaths(tab.currentPath, tab.secondaryCurrentPath)
+    }
+
+    function saveSplitPaths(primaryPath, secondaryPath) {
+        if (!primaryPath || !secondaryPath || primaryPath === secondaryPath)
+            return
+        var orientation = root.isSplitHorizontal ? "horizontal" : "vertical"
+        var splits = config.savedSplits.slice()
+        for (var i = 0; i < splits.length; ++i) {
+            if (splits[i].primaryPath === primaryPath && splits[i].secondaryPath === secondaryPath
+                    && splits[i].orientation === orientation) {
+                toast.show("This split is already in the sidebar", "info")
+                return
+            }
+        }
+
+        var name = pathDisplayName(primaryPath) + " + " + pathDisplayName(secondaryPath)
+        splits.push({
+            name: name,
+            primaryPath: primaryPath,
+            secondaryPath: secondaryPath,
+            orientation: orientation
+        })
+        config.saveSavedSplits(splits)
+        toast.show("Split saved to sidebar — right-click it there to remove", "info")
+    }
+
+    function saveSelectedFolders(paths) {
+        if (!paths || paths.length !== 2)
+            return
+        root.saveSplitPaths(paths[0], paths[1])
+    }
+
+    function removeSavedSplit(index) {
+        var splits = config.savedSplits.slice()
+        if (index < 0 || index >= splits.length)
+            return
+        splits.splice(index, 1)
+        config.saveSavedSplits(splits)
+    }
+
+    function restoreSavedSplit(split) {
+        if (!tabModel.activeTab || !split)
+            return
+
+        var tab = tabModel.activeTab
+        tab.splitViewEnabled = true
+        tab.splitOrientation = (split.orientation || config.splitOrientation || "vertical").toLowerCase()
+        tab.navigateTo(split.primaryPath)
+        tab.resetSecondaryTo(split.secondaryPath)
         root.updateSelectionStatus()
     }
 
@@ -3124,6 +3196,7 @@ ApplicationWindow {
                 }
                 onRestoreRequested: (paths) => fileOps.restoreFromTrash(paths)
                 onEmptyTrashRequested: root.openDialog(emptyTrashConfirmDialogLoader)
+                onSaveSplitRequested: (paths) => root.saveSelectedFolders(paths)
 
                 onDeleteRequested: (paths) => {
                     deleteConfirmPaths = paths
@@ -3158,6 +3231,8 @@ ApplicationWindow {
                 onCustomActionRequested: (action) => {
                     if (action === "close_split")
                         root.toggleSplitView()
+                    else if (action === "save_current_split")
+                        root.saveCurrentSplit()
                 }
 
                 onViewModeRequested: (mode) => {
@@ -3212,7 +3287,15 @@ ApplicationWindow {
                 }
 
                 onCustomActionRequested: (action) => {
-                    if (action === "emptytrash") {
+                    if (action === "bookmark_saved_split") {
+                        if (sidebarItem.primaryPath && sidebarItem.secondaryPath) {
+                            bookmarks.addBookmark(sidebarItem.primaryPath)
+                            bookmarks.addBookmark(sidebarItem.secondaryPath)
+                            toast.show("Both folders added to bookmarks", "info")
+                        }
+                    } else if (action === "remove_saved_split") {
+                        root.removeSavedSplit(sidebarItem.index)
+                    } else if (action === "emptytrash") {
                         root.openDialog(emptyTrashConfirmDialogLoader)
                     } else if (action === "renamebookmark") {
                         if (sidebarItem.kind === "bookmark" && sidebarItem.index >= 0)
@@ -3410,6 +3493,25 @@ ApplicationWindow {
     Shortcut {
         sequence: config.shortcutMap["focus_right_pane"]
         onActivated: root.setActivePane("secondary")
+    }
+
+    Shortcut {
+        sequence: config.shortcutMap["focus_up_pane"]
+        onActivated: {
+            if (root.isSplitHorizontal) root.setActivePane("primary")
+        }
+    }
+
+    Shortcut {
+        sequence: config.shortcutMap["focus_down_pane"]
+        onActivated: {
+            if (root.isSplitHorizontal) root.setActivePane("secondary")
+        }
+    }
+
+    Shortcut {
+        sequence: config.shortcutMap["toggle_split_orientation"]
+        onActivated: root.toggleSplitOrientation()
     }
 
     Shortcut {
@@ -3671,6 +3773,14 @@ ApplicationWindow {
             ]
         }
 
+        if (item.kind === "savedSplit") {
+            return [
+                { text: "Add Both Folders to Bookmarks", shortcut: "", action: "bookmark_saved_split", icon: "Bookmark" },
+                { separator: true },
+                { text: "Remove Saved Split", shortcut: "", action: "remove_saved_split", destructive: true }
+            ]
+        }
+
         if (item.kind === "device") {
             if (!item.mounted)
                 return [
@@ -3790,6 +3900,11 @@ ApplicationWindow {
         menu.isEmptySpace = (filePath === "")
         var sel = getSelectedPaths(pane)
         menu.selectedPaths = (sel.length > 1) ? sel : (filePath !== "" ? [filePath] : [])
+        var selectedItems = getSelectedItems(pane)
+        menu.selectedFolderPaths = selectedItems.length === 2
+                && selectedItems[0].isDir && selectedItems[1].isDir
+            ? [selectedItems[0].path, selectedItems[1].path]
+            : []
         menu.popup(position.x, position.y)
     }
 
@@ -3862,6 +3977,9 @@ ApplicationWindow {
                     onBookmarkClicked: (path) => {
                         root.navigateActivePaneTo(path)
                     }
+                    onSavedSplitClicked: (split) => {
+                        root.restoreSavedSplit(split)
+                    }
                     onRenamingBookmarkIndexChanged: {
                         if (renamingBookmarkIndex < 0)
                             root.scheduleActivePaneFocus()
@@ -3876,6 +3994,7 @@ ApplicationWindow {
                         menu.targetIsDir = !!item.path
                         menu.isEmptySpace = false
                         menu.selectedPaths = item.path ? [item.path] : []
+                        menu.selectedFolderPaths = []
                         menu.popup(position.x, position.y)
                     }
                     onRecentsClicked: {
@@ -3958,6 +4077,7 @@ ApplicationWindow {
                 canGoBack: activePaneCanGoBack()
                 canGoForward: activePaneCanGoForward()
                 splitViewEnabled: root.splitViewEnabled()
+                isSplitHorizontal: root.isSplitHorizontal
                 isRecentsView: root.isRecentsView
                 isTrashView: root.isTrashView
                 isRemoteView: root.isRemoteView
@@ -3993,6 +4113,7 @@ ApplicationWindow {
                 }
                 onEmptyTrashRequested: root.openDialog(emptyTrashConfirmDialogLoader)
                 onSplitViewToggled: root.toggleSplitView()
+                onSplitOrientationToggled: root.toggleSplitOrientation()
                 onHomeClicked: {
                     root.navigateActivePaneTo(fsModel.homePath())
                 }
@@ -4055,22 +4176,43 @@ ApplicationWindow {
                     }
                 }
 
-                RowLayout {
+                Item {
                     id: paneRow
                     anchors.fill: parent
                     anchors.margins: 8 * root.splitTransitionProgress
-                    spacing: 8 * root.splitTransitionProgress
-
+                    readonly property real spacing: 8 * root.splitTransitionProgress
                     readonly property real dividerWidth: root.splitTransitionProgress
-                    readonly property real secondaryPreferredWidth: Math.max(
-                        0,
-                        (width - spacing - dividerWidth) * 0.5 * root.splitTransitionProgress
-                    )
+                    readonly property real gap: 2 * spacing + dividerWidth
+
+                    // Pane sizes for each orientation; the secondary pane grows
+                    // in from zero while the split opens.
+                    readonly property real secondaryWidth: Math.max(
+                        0, (width - spacing - dividerWidth) * 0.5 * root.splitTransitionProgress)
+                    readonly property real secondaryHeight: Math.max(
+                        0, (height - spacing - dividerWidth) * 0.5 * root.splitTransitionProgress)
+                    readonly property real primaryWidth: width - gap - secondaryWidth
+                    readonly property real primaryHeight: height - gap - secondaryHeight
+
+                    // 0 = side by side, 1 = top and bottom. The switch folds in
+                    // two steps so the panes never overlap: the secondary pane
+                    // drops into the bottom-right quarter, then both panes
+                    // stretch to the full width. Going back runs it in reverse.
+                    property real orientationProgress: root.isSplitHorizontal ? 1 : 0
+                    Behavior on orientationProgress {
+                        NumberAnimation {
+                            duration: Theme.animDurationSlow
+                            easing.type: Theme.animEasingTransition; easing.bezierCurve: Theme.animBezierCurve
+                        }
+                    }
+                    readonly property real foldDown: Math.min(1, orientationProgress * 2)
+                    readonly property real foldAcross: Math.max(0, orientationProgress * 2 - 1)
+                    function mix(from, to, t) { return from + (to - from) * t }
 
                     Rectangle {
                         id: primaryPaneFrame
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
+                        objectName: "primaryPaneFrame"
+                        width: paneRow.mix(paneRow.primaryWidth, paneRow.width, paneRow.foldAcross)
+                        height: paneRow.mix(paneRow.height, paneRow.primaryHeight, paneRow.foldDown)
                         radius: Theme.radiusMedium * root.splitTransitionProgress
                         clip: true
                         // Fill stays opaque the entire time so the pane never
@@ -4134,31 +4276,39 @@ ApplicationWindow {
                         id: dividerLoader
                         active: root.splitViewPresented
                         visible: active
-                        Layout.preferredWidth: paneRow.dividerWidth
-                        Layout.fillHeight: true
-                        opacity: root.splitTransitionProgress
+                        readonly property bool across: paneRow.orientationProgress >= 0.5
+                        x: across ? 0 : paneRow.primaryWidth + paneRow.spacing
+                        y: across ? paneRow.primaryHeight + paneRow.spacing : 0
+                        width: across ? paneRow.width : paneRow.dividerWidth
+                        height: across ? paneRow.dividerWidth : paneRow.height
+                        // Hidden mid-fold, where neither position fits.
+                        opacity: paneRow.orientationProgress === 0 || paneRow.orientationProgress === 1
+                            ? root.splitTransitionProgress : 0
 
                         sourceComponent: Rectangle {
-                            width: 1
+                            anchors.fill: parent
                             color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.08)
                         }
                     }
 
                     Loader {
                         id: secondaryPaneLoader
+                        objectName: "secondaryPaneLoader"
                         active: root.splitViewPresented
                         visible: active
                         enabled: root.splitViewEnabled()
                         opacity: root.splitTransitionProgress
-                        Layout.preferredWidth: paneRow.secondaryPreferredWidth
-                        Layout.fillHeight: true
+                        x: paneRow.mix(paneRow.primaryWidth + paneRow.gap, 0, paneRow.foldAcross)
+                        y: paneRow.mix(0, paneRow.primaryHeight + paneRow.gap, paneRow.foldDown)
+                        width: paneRow.mix(paneRow.secondaryWidth, paneRow.width, paneRow.foldAcross)
+                        height: paneRow.mix(paneRow.height, paneRow.secondaryHeight, paneRow.foldDown)
 
                         sourceComponent: Rectangle {
                             id: secondaryPaneFrame
                             property alias fileView: secondaryFileViewContainer
                             opacity: root.splitTransitionProgress
                             scale: 0.96 + (0.04 * root.splitTransitionProgress)
-                            transformOrigin: Item.Right
+                            transformOrigin: root.isSplitHorizontal ? Item.Bottom : Item.Right
                             radius: Theme.radiusMedium
                             clip: true
                             color: Theme.containerColor(Theme.crust, 0.14)

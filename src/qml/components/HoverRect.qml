@@ -7,8 +7,12 @@ Rectangle {
     property alias hovered: hoverArea.containsMouse
     property alias cursorShape: hoverArea.cursorShape
     property bool hoverEnabled: true
+    // Off by default so right clicks reach whatever sits underneath, such as
+    // the breadcrumb's right-click-to-edit area.
+    property bool rightClickEnabled: false
 
     signal clicked()
+    signal rightClicked()
     signal doubleClicked()
 
     color: hoverEnabled && hoverArea.containsMouse
@@ -22,9 +26,15 @@ Rectangle {
         id: hoverArea
         anchors.fill: parent
         hoverEnabled: root.hoverEnabled
+        acceptedButtons: root.rightClickEnabled ? Qt.LeftButton | Qt.RightButton : Qt.LeftButton
         cursorShape: root.hoverEnabled ? Qt.PointingHandCursor : Qt.ArrowCursor
         enabled: root.hoverEnabled
-        onClicked: root.clicked()
+        onClicked: (mouse) => {
+            if (mouse.button === Qt.RightButton)
+                root.rightClicked()
+            else
+                root.clicked()
+        }
         onDoubleClicked: root.doubleClicked()
     }
 }

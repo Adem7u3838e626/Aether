@@ -319,6 +319,43 @@ private slots:
         }
     }
 
+    // Saved splits use snake_case keys like the rest of the file, expand a
+    // hand-written ~/ and survive a save and reload.
+    void testSavedSplitsRoundTrip()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.path() + "/config.toml";
+        QFile f(path);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write("[saved_splits]\nsplits = [ { name = \"N\", primary_path = \"~/a\", "
+                "secondary_path = \"/b\", orientation = \"horizontal\" } ]\n");
+        f.close();
+
+        ConfigManager mgr(path);
+        QCOMPARE(mgr.savedSplits().size(), 1);
+        const QVariantMap split = mgr.savedSplits().first().toMap();
+        QCOMPARE(split.value("primaryPath").toString(), QDir::homePath() + "/a");
+        QCOMPARE(split.value("secondaryPath").toString(), QStringLiteral("/b"));
+        QCOMPARE(split.value("orientation").toString(), QStringLiteral("horizontal"));
+
+        mgr.saveSavedSplits(mgr.savedSplits());
+        ConfigManager mgr2(path);
+        QCOMPARE(mgr2.savedSplits(), mgr.savedSplits());
+    }
+
+    void testSplitOrientationSetting()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.path() + "/config.toml";
+        ConfigManager mgr(path);
+        QCOMPARE(mgr.splitOrientation(), QStringLiteral("vertical"));
+        mgr.saveSettings({{"splitOrientation", "horizontal"}});
+        QCOMPARE(mgr.splitOrientation(), QStringLiteral("horizontal"));
+        mgr.saveSettings({{"splitOrientation", "diagonal"}});   // ignored
+        ConfigManager mgr2(path);
+        QCOMPARE(mgr2.splitOrientation(), QStringLiteral("horizontal"));
+    }
+
     void testBookmarkNamesRoundTrip()
     {
         QTemporaryDir dir;
@@ -383,6 +420,9 @@ private slots:
         QCOMPARE(mgr.shortcut("select_all"), QString("Ctrl+A"));
         QCOMPARE(mgr.shortcut("focus_left_pane"), QString("Ctrl+Alt+Left"));
         QCOMPARE(mgr.shortcut("focus_right_pane"), QString("Ctrl+Alt+Right"));
+        QCOMPARE(mgr.shortcut("focus_up_pane"), QString("Ctrl+Alt+Up"));
+        QCOMPARE(mgr.shortcut("focus_down_pane"), QString("Ctrl+Alt+Down"));
+        QCOMPARE(mgr.shortcut("toggle_split_orientation"), QString("Ctrl+Shift+O"));
         QCOMPARE(mgr.shortcut("focus_next_pane"), QString("F6"));
         QCOMPARE(mgr.shortcut("focus_previous_pane"), QString("Shift+F6"));
     }
