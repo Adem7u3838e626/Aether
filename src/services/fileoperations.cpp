@@ -1195,8 +1195,9 @@ int FileOperations::trashFiles(const QStringList &paths)
 {
     return startSimpleOperation(
         QString("Trashing %1 item(s)...").arg(paths.size()), paths,
-        [paths](ProgressReporter report) -> QString {
+        [this, paths](ProgressReporter report) -> QString {
             QString lastError;
+            QStringList unsupported;
             const int total = paths.size();
             // Inside a Flatpak, GLib's g_file_trash() puts files in the
             // *sandbox's* trash (~/.var/app/<app-id>/data/Trash) because
@@ -1215,7 +1216,9 @@ int FileOperations::trashFiles(const QStringList &paths)
                     proc.waitForFinished(10000);
                     if (proc.exitCode() != 0) {
                         const QString err = QString::fromUtf8(proc.readAllStandardError()).trimmed();
-                        if (!err.isEmpty())
+                        if (err.contains(QStringLiteral("not supported"), Qt::CaseInsensitive))
+                            unsupported.append(paths[i]);
+                        else if (!err.isEmpty())
                             lastError = err;
                     }
                     continue;
@@ -1224,12 +1227,26 @@ int FileOperations::trashFiles(const QStringList &paths)
                 GFile *file = gFileForLocation(normalized);
                 GError *gErr = nullptr;
                 if (!g_file_trash(file, nullptr, &gErr)) {
-                    if (gErr) {
+                    if (gErr && g_error_matches(gErr, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED))
+                        unsupported.append(paths[i]);
+                    else if (gErr)
                         lastError = QString::fromUtf8(gErr->message);
+                    if (gErr)
                         g_error_free(gErr);
-                    }
                 }
                 g_object_unref(file);
+            }
+            // Network shares (SMB, FTP, ...) and removable drives without a
+            // usable trash directory both report NOT_SUPPORTED. Deleting
+            // those for good is the user's call, so ask instead of falling
+            // back silently. The error keeps UndoManager from recording a
+            // trash that did not happen.
+            if (!unsupported.isEmpty()) {
+                emit trashUnsupported(unsupported);
+                if (lastError.isEmpty())
+                    lastError = unsupported.size() == 1
+                        ? QStringLiteral("This item can't be moved to the trash")
+                        : QStringLiteral("%1 items can't be moved to the trash").arg(unsupported.size());
             }
             return lastError;
         });

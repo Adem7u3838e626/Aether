@@ -126,6 +126,9 @@ signals:
     // it (-1 for synchronous failures), so callers waiting on one operation
     // are not satisfied by another one finishing first.
     void operationFinished(bool success, const QString &error, int operationId = -1);
+    // trashFiles() hit paths whose filesystem has no trash; the UI should
+    // offer to delete them permanently.
+    void trashUnsupported(const QStringList &paths);
 
 private slots:
     void onExtractFolderChosen(uint response, const QVariantMap &results);
