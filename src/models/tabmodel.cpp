@@ -153,14 +153,6 @@ void TabModel::setSplitOrientation(const QString &orientation)
     emit splitOrientationChanged();
 }
 
-void TabModel::toggleSplitOrientation()
-{
-    if (m_splitOrientation == QStringLiteral("horizontal"))
-        setSplitOrientation(QStringLiteral("vertical"));
-    else
-        setSplitOrientation(QStringLiteral("horizontal"));
-}
-
 void TabModel::setSecondaryCurrentPath(const QString &path)
 {
     if (path.isEmpty() || m_secondaryCurrentPath == path)

@@ -656,6 +656,25 @@ private slots:
         QCOMPARE(root->property("activePane").toString(), QStringLiteral("primary"));
     }
 
+    // A tab with no orientation of its own follows split_orientation, so the
+    // first toggle has to flip that, not blindly pick "horizontal".
+    void testToggleSplitOrientationFromConfigDefault()
+    {
+        App app;
+        QDir().mkpath(app.home.path() + "/.config/hyprfm");
+        QFile cfg(app.home.path() + "/.config/hyprfm/config.toml");
+        QVERIFY(cfg.open(QIODevice::WriteOnly));
+        cfg.write("[general]\nsplit_orientation = \"horizontal\"\n");
+        cfg.close();
+        QVERIFY(app.load());
+
+        QObject *root = app.window->contentItem()->parent();
+        QVERIFY(root);
+        QVERIFY(root->property("isSplitHorizontal").toBool());
+        QVERIFY(QMetaObject::invokeMethod(root, "toggleSplitOrientation"));
+        QVERIFY(!root->property("isSplitHorizontal").toBool());
+    }
+
     void testMergingTwoSelectedFoldersAddsSavedSplit()
     {
         App app;

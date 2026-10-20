@@ -55,7 +55,6 @@ public:
     Q_INVOKABLE void secondaryGoForward();
     Q_INVOKABLE void secondaryGoUp();
     Q_INVOKABLE void resetSecondaryTo(const QString &path);
-    Q_INVOKABLE void toggleSplitOrientation();
 
 signals:
     void currentPathChanged();

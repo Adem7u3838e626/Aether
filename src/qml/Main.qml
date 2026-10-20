@@ -287,7 +287,9 @@ ApplicationWindow {
 
     function toggleSplitOrientation() {
         if (!tabModel.activeTab) return
-        tabModel.activeTab.toggleSplitOrientation()
+        // From the effective orientation: a tab with none set follows the
+        // config default, which may already be horizontal.
+        tabModel.activeTab.splitOrientation = root.isSplitHorizontal ? "vertical" : "horizontal"
     }
 
     function paneBaseModel(pane) {
