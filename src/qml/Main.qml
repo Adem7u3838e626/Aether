@@ -671,8 +671,6 @@ ApplicationWindow {
     }
 
     function navigateActivePaneTo(path) {
-        if (tabModel.activeTab && path === fsModel.homePath() && splitViewEnabled())
-            root.toggleSplitView()
         navigatePaneTo(activePane, path)
     }
 

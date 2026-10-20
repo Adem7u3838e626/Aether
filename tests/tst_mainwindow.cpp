@@ -634,28 +634,6 @@ private slots:
                                                  : focused->objectName())));
     }
 
-    void testNavigatingHomeClosesSplitView()
-    {
-        App app;
-        QVERIFY(app.load());
-
-        TabModel *tab = app.tabModel->activeTab();
-        QVERIFY(tab);
-        tab->navigateTo(app.home.path() + "/first");
-        tab->resetSecondaryTo(app.home.path() + "/second");
-        tab->setSplitViewEnabled(true);
-
-        QObject *root = app.window->contentItem()->parent();
-        QVERIFY(root);
-        const QString home = QDir::homePath();
-        QVERIFY(QMetaObject::invokeMethod(root, "navigateActivePaneTo",
-                                          Q_ARG(QVariant, home)));
-
-        QTRY_VERIFY(!tab->splitViewEnabled());
-        QCOMPARE(tab->currentPath(), home);
-        QCOMPARE(root->property("activePane").toString(), QStringLiteral("primary"));
-    }
-
     // A tab with no orientation of its own follows split_orientation, so the
     // first toggle has to flip that, not blindly pick "horizontal".
     void testToggleSplitOrientationFromConfigDefault()
