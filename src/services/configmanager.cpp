@@ -496,13 +496,19 @@ void ConfigManager::loadConfig()
         if (auto arr = config["saved_splits"]["splits"].as_array()) {
             for (const auto &item : *arr) {
                 if (auto tbl = item.as_table()) {
+                    // Hand-written entries may start with ~/, which the tab
+                    // model would treat as a relative path.
+                    const auto expand = [](const std::string &path) {
+                        const QString p = QString::fromStdString(path);
+                        return p.startsWith(QLatin1String("~/")) ? QDir::homePath() + p.mid(1) : p;
+                    };
                     QVariantMap split;
                     if (auto v = (*tbl)["name"].value<std::string>())
                         split.insert("name", QString::fromStdString(*v));
-                    if (auto v = (*tbl)["primaryPath"].value<std::string>())
-                        split.insert("primaryPath", QString::fromStdString(*v));
-                    if (auto v = (*tbl)["secondaryPath"].value<std::string>())
-                        split.insert("secondaryPath", QString::fromStdString(*v));
+                    if (auto v = (*tbl)["primary_path"].value<std::string>())
+                        split.insert("primaryPath", expand(*v));
+                    if (auto v = (*tbl)["secondary_path"].value<std::string>())
+                        split.insert("secondaryPath", expand(*v));
                     if (auto v = (*tbl)["orientation"].value<std::string>())
                         split.insert("orientation", QString::fromStdString(*v));
                     if (split.contains("primaryPath") && split.contains("secondaryPath"))
@@ -560,6 +566,7 @@ void ConfigManager::loadConfig()
     }
     emit listColumnsChanged();
     emit millerFractionsChanged();
+    emit savedSplitsChanged();
 }
 
 // Keeps every Miller column at least kMillerMinFraction wide: parent first,
@@ -732,9 +739,9 @@ current_fraction = 0.5
 
 [saved_splits]
 # Saved split views. Reopen both panes of a split layout with one click.
-# Each entry: name, primaryPath, secondaryPath, orientation ("vertical"|"horizontal").
+# Each entry: name, primary_path, secondary_path, orientation ("vertical"|"horizontal").
 # splits = [
-#     { name = "Codici - Flowchart", primaryPath = "~/Codici", secondaryPath = "~/Flowchart", orientation = "vertical" }
+#     { name = "Code + Notes", primary_path = "~/Code", secondary_path = "~/Notes", orientation = "vertical" }
 # ]
 
 [context_menu]
@@ -1164,14 +1171,6 @@ void ConfigManager::saveSettings(const QVariantMap &settings)
         general.insert_or_assign("font_family", m_fontFamily.toStdString());
     }
 
-    if (settings.contains("splitOrientation")) {
-        const QString splitOrientation = settings.value("splitOrientation").toString().trimmed().toLower();
-        if (splitOrientation == QLatin1String("horizontal") || splitOrientation == QLatin1String("vertical")) {
-            m_splitOrientation = splitOrientation;
-            general.insert_or_assign("split_orientation", splitOrientation.toStdString());
-        }
-    }
-
     if (settings.contains("showHidden")) {
         m_showHidden = settings.value("showHidden").toBool();
         general.insert_or_assign("show_hidden", m_showHidden);
@@ -1553,9 +1552,9 @@ void ConfigManager::saveSavedSplits(const QVariantList &splits)
         if (const auto name = split.value("name").toString(); !name.isEmpty())
             entry.insert_or_assign("name", name.toStdString());
         if (const auto primary = split.value("primaryPath").toString(); !primary.isEmpty())
-            entry.insert_or_assign("primaryPath", primary.toStdString());
+            entry.insert_or_assign("primary_path", primary.toStdString());
         if (const auto secondary = split.value("secondaryPath").toString(); !secondary.isEmpty())
-            entry.insert_or_assign("secondaryPath", secondary.toStdString());
+            entry.insert_or_assign("secondary_path", secondary.toStdString());
         if (const auto orientation = split.value("orientation").toString(); !orientation.isEmpty())
             entry.insert_or_assign("orientation", orientation.toStdString());
         arr.push_back(std::move(entry));

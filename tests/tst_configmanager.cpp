@@ -319,6 +319,30 @@ private slots:
         }
     }
 
+    // Saved splits use snake_case keys like the rest of the file, expand a
+    // hand-written ~/ and survive a save and reload.
+    void testSavedSplitsRoundTrip()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.path() + "/config.toml";
+        QFile f(path);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write("[saved_splits]\nsplits = [ { name = \"N\", primary_path = \"~/a\", "
+                "secondary_path = \"/b\", orientation = \"horizontal\" } ]\n");
+        f.close();
+
+        ConfigManager mgr(path);
+        QCOMPARE(mgr.savedSplits().size(), 1);
+        const QVariantMap split = mgr.savedSplits().first().toMap();
+        QCOMPARE(split.value("primaryPath").toString(), QDir::homePath() + "/a");
+        QCOMPARE(split.value("secondaryPath").toString(), QStringLiteral("/b"));
+        QCOMPARE(split.value("orientation").toString(), QStringLiteral("horizontal"));
+
+        mgr.saveSavedSplits(mgr.savedSplits());
+        ConfigManager mgr2(path);
+        QCOMPARE(mgr2.savedSplits(), mgr.savedSplits());
+    }
+
     void testBookmarkNamesRoundTrip()
     {
         QTemporaryDir dir;
