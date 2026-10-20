@@ -778,8 +778,10 @@ Item {
                 }
                 if (!splitViewEnabled)
                     items.push({ text: "Split View Here", shortcut: "", action: "split_here", icon: "SquareSplitHorizontal" })
-                else
+                else {
                     items.push({ text: "Close Split View", shortcut: "", action: "close_split", icon: "SquareSplitHorizontal" })
+                    items.push({ text: "Save Split to Sidebar", shortcut: "", action: "save_current_split", icon: "Bookmark" })
+                }
                 items.push({ separator: true })
                 if (!remoteContext)
                     items.push({ text: "Open in Terminal", shortcut: "", action: "terminal", icon: "Terminal" })
@@ -820,6 +822,7 @@ Item {
         case "split_open": splitViewRequested(targetPath); break
         case "split_here": splitViewRequested(effectiveDir); break
         case "close_split": customActionRequested("close_split"); break
+        case "save_current_split": customActionRequested("save_current_split"); break
         case "view_grid": viewModeRequested("grid"); break
         case "view_miller": viewModeRequested("miller"); break
         case "view_detailed": viewModeRequested("detailed"); break

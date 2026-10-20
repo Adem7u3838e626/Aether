@@ -69,7 +69,6 @@ Rectangle {
     signal navigateRequested(string targetPath)
     signal splitViewToggled()
     signal splitOrientationToggled()
-    signal splitSaved()
     signal viewModeRequested(string mode)
     signal typeFilterChanged(string filter)
     signal dateFilterChanged(string filter)
@@ -353,21 +352,6 @@ Rectangle {
                         rotation: root.isSplitHorizontal ? 90 : 0
                         Behavior on rotation { NumberAnimation { duration: Theme.animDuration } }
                         color: root.splitViewEnabled ? Theme.accent : Theme.text
-                    }
-                }
-
-                // Save current split to sidebar (only while a split is active)
-                HoverRect {
-                    width: Theme.controlSize; height: Theme.controlSize
-                    visible: root.splitViewEnabled && !root.searchMode
-                    color: hovered
-                        ? Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.1)
-                        : "transparent"
-                    onClicked: root.splitSaved()
-                    IconBookmark {
-                        anchors.centerIn: parent
-                        size: 18
-                        color: parent.hovered ? Theme.accent : Theme.subtext
                     }
                 }
 

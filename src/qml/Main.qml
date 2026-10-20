@@ -3231,6 +3231,8 @@ ApplicationWindow {
                 onCustomActionRequested: (action) => {
                     if (action === "close_split")
                         root.toggleSplitView()
+                    else if (action === "save_current_split")
+                        root.saveCurrentSplit()
                 }
 
                 onViewModeRequested: (mode) => {
@@ -4112,7 +4114,6 @@ ApplicationWindow {
                 onEmptyTrashRequested: root.openDialog(emptyTrashConfirmDialogLoader)
                 onSplitViewToggled: root.toggleSplitView()
                 onSplitOrientationToggled: root.toggleSplitOrientation()
-                onSplitSaved: root.saveCurrentSplit()
                 onHomeClicked: {
                     root.navigateActivePaneTo(fsModel.homePath())
                 }

@@ -721,6 +721,44 @@ private slots:
         QCOMPARE(config->property("savedSplits").toList().size(), 1);
     }
 
+    // With a split open, right-clicking empty space offers to save it.
+    void testEmptySpaceMenuSavesTheOpenSplit()
+    {
+        App app;
+        const QString first = app.home.path() + "/first";
+        const QString second = app.home.path() + "/second";
+        QVERIFY(QDir().mkpath(first));
+        QVERIFY(QDir().mkpath(second));
+        QVERIFY(app.load());
+        TabModel *tab = app.tabModel->activeTab();
+        tab->navigateTo(first);
+        tab->setSplitViewEnabled(true);
+        tab->resetSecondaryTo(second);
+
+        QVERIFY(app.item("contextMenuLoader")->setProperty("active", true));
+        QObject *menu = app.item("contextMenu");
+        QVERIFY(menu);
+        menu->setProperty("isEmptySpace", true);
+        QTRY_VERIFY(menu->property("splitViewEnabled").toBool());
+
+        QVariant modelResult;
+        QVERIFY(QMetaObject::invokeMethod(menu, "buildModel", Q_RETURN_ARG(QVariant, modelResult)));
+        const QVariantList items = modelResult.toList();
+        QVERIFY(std::any_of(items.cbegin(), items.cend(), [](const QVariant &entry) {
+            return entry.toMap().value("action").toString() == "save_current_split";
+        }));
+
+        QVERIFY(QMetaObject::invokeMethod(menu, "executeAction",
+                                          Q_ARG(QVariant, QStringLiteral("save_current_split")),
+                                          Q_ARG(QVariant, QVariant()),
+                                          Q_ARG(QVariant, QVariant())));
+        auto *config = app.engine.rootContext()->contextProperty("config").value<QObject *>();
+        const QVariantList saved = config->property("savedSplits").toList();
+        QCOMPARE(saved.size(), 1);
+        QCOMPARE(saved.first().toMap().value("primaryPath").toString(), first);
+        QCOMPARE(saved.first().toMap().value("secondaryPath").toString(), second);
+    }
+
     void testSavedSplitContextMenuCanBookmarkBothFolders()
     {
         App app;
