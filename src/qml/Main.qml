@@ -4312,6 +4312,11 @@ ApplicationWindow {
             root.askArchivePassword(archivePath, destination, retry)
         }
 
+        function onTrashUnsupported(paths) {
+            root.deleteConfirmPaths = paths
+            root.openDialog(deleteConfirmDialogLoader)
+        }
+
         function onOperationFinished(success, error, operationId) {
             fsModel.refresh()
             splitFsModel.refresh()

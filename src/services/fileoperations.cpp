@@ -1195,8 +1195,9 @@ int FileOperations::trashFiles(const QStringList &paths)
 {
     return startSimpleOperation(
         QString("Trashing %1 item(s)...").arg(paths.size()), paths,
-        [paths](ProgressReporter report) -> QString {
+        [this, paths](ProgressReporter report) -> QString {
             QString lastError;
+            QStringList unsupported;
             const int total = paths.size();
             // Inside a Flatpak, GLib's g_file_trash() puts files in the
             // *sandbox's* trash (~/.var/app/<app-id>/data/Trash) because
@@ -1215,26 +1216,10 @@ int FileOperations::trashFiles(const QStringList &paths)
                     proc.waitForFinished(10000);
                     if (proc.exitCode() != 0) {
                         const QString err = QString::fromUtf8(proc.readAllStandardError()).trimmed();
-                        // Network filesystems (SMB, FTP, …) don't implement
-                        // the trash spec; fall back to permanent delete.
-                        if (err.contains(QStringLiteral("Operation not supported"),
-                                         Qt::CaseInsensitive)
-                            || err.contains(QStringLiteral("not supported"),
-                                            Qt::CaseInsensitive)) {
-                            QProcess del;
-                            del.start(QStringLiteral("flatpak-spawn"),
-                                      {QStringLiteral("--host"), QStringLiteral("gio"),
-                                       QStringLiteral("remove"), normalized});
-                            del.waitForFinished(10000);
-                            if (del.exitCode() != 0) {
-                                const QString delErr =
-                                    QString::fromUtf8(del.readAllStandardError()).trimmed();
-                                if (!delErr.isEmpty())
-                                    lastError = delErr;
-                            }
-                        } else if (!err.isEmpty()) {
+                        if (err.contains(QStringLiteral("not supported"), Qt::CaseInsensitive))
+                            unsupported.append(paths[i]);
+                        else if (!err.isEmpty())
                             lastError = err;
-                        }
                     }
                     continue;
                 }
@@ -1242,23 +1227,26 @@ int FileOperations::trashFiles(const QStringList &paths)
                 GFile *file = gFileForLocation(normalized);
                 GError *gErr = nullptr;
                 if (!g_file_trash(file, nullptr, &gErr)) {
-                    // Network filesystems (SMB, FTP, …) return
-                    // G_IO_ERROR_NOT_SUPPORTED because they don't implement
-                    // the trash spec. Fall back to permanent delete — the
-                    // same behaviour as every other file manager on a share
-                    // that has no trash.
-                    if (gErr && g_error_matches(gErr, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED)) {
-                        g_error_free(gErr);
-                        gErr = nullptr;
-                        QString delErr;
-                        if (!deleteGFileRecursive(file, &delErr) && !delErr.isEmpty())
-                            lastError = delErr;
-                    } else if (gErr) {
+                    if (gErr && g_error_matches(gErr, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED))
+                        unsupported.append(paths[i]);
+                    else if (gErr)
                         lastError = QString::fromUtf8(gErr->message);
+                    if (gErr)
                         g_error_free(gErr);
-                    }
                 }
                 g_object_unref(file);
+            }
+            // Network shares (SMB, FTP, ...) and removable drives without a
+            // usable trash directory both report NOT_SUPPORTED. Deleting
+            // those for good is the user's call, so ask instead of falling
+            // back silently. The error keeps UndoManager from recording a
+            // trash that did not happen.
+            if (!unsupported.isEmpty()) {
+                emit trashUnsupported(unsupported);
+                if (lastError.isEmpty())
+                    lastError = unsupported.size() == 1
+                        ? QStringLiteral("This item can't be moved to the trash")
+                        : QStringLiteral("%1 items can't be moved to the trash").arg(unsupported.size());
             }
             return lastError;
         });
