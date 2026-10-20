@@ -344,6 +344,7 @@ Rectangle {
                         : (hovered
                             ? Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.1)
                             : "transparent")
+                    rightClickEnabled: true
                     onClicked: root.splitViewToggled()
                     onRightClicked: root.splitOrientationToggled()
                     IconSquareSplitHorizontal {
