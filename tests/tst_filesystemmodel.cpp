@@ -69,6 +69,41 @@ private slots:
         QCOMPARE(ready.count(), 1);
     }
 
+    // A gvfs share lists only once mounted, so a failed `gio list` mounts and
+    // lists again. Entries with standard::target-uri open their target:
+    // shortcuts as folders, regular files (recent:///) still as files.
+    void testRemoteListMountsAndFollowsTargets()
+    {
+        QTemporaryDir bin;
+        const QString mounted = bin.filePath("mounted");
+        QFile gio(bin.filePath("gio"));
+        QVERIFY(gio.open(QIODevice::WriteOnly));
+        gio.write(QStringLiteral(
+            "#!/bin/sh\n"
+            "if [ \"$1\" = mount ]; then read x || touch '%1'; exit 0; fi\n"
+            "[ -e '%1' ] || exit 2\n"
+            "printf 'network:///nas\\t0\\t(shortcut)\\tstandard::display-name=NAS standard::target-uri=smb://nas/\\n'\n"
+            "printf 'recent:///abc\\t5\\t(regular)\\tstandard::display-name=a.txt standard::content-type=text/plain standard::target-uri=file:///tmp/a.txt\\n'\n"
+        ).arg(mounted).toUtf8());
+        gio.close();
+        gio.setPermissions(gio.permissions() | QFileDevice::ExeOwner);
+        const QByteArray oldPath = qgetenv("PATH");
+        qputenv("PATH", bin.path().toUtf8() + ':' + oldPath);
+
+        FileSystemModel model;
+        model.setRootPath(QStringLiteral("network:///"));
+        QTRY_COMPARE_WITH_TIMEOUT(model.rowCount(), 2, 5000);
+        qputenv("PATH", oldPath);
+        QVERIFY(QFile::exists(mounted));   // mount ran with stdin at EOF
+
+        const QModelIndex nas = model.index(0);
+        QCOMPARE(model.data(nas, FileSystemModel::FilePathRole).toString(), QStringLiteral("smb://nas/"));
+        QVERIFY(model.data(nas, FileSystemModel::IsDirRole).toBool());
+        const QModelIndex file = model.index(1);
+        QCOMPARE(model.data(file, FileSystemModel::FilePathRole).toString(), QStringLiteral("/tmp/a.txt"));
+        QVERIFY(!model.data(file, FileSystemModel::IsDirRole).toBool());
+    }
+
     void initTestCase()
     {
         QStandardPaths::setTestModeEnabled(true);

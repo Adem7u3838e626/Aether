@@ -457,14 +457,12 @@ QVariantMap buildRemoteEntryFromLine(const QString &line)
     const bool hasTarget = !targetUri.isEmpty() && resolvedTarget != uri;
     const QString filePath = hasTarget ? resolvedTarget : uri;
 
-    // A followed target is navigable unless the content-type explicitly
-    // says otherwise. Discovery shortcuts and mountable share roots are
-    // directories in practice; a regular-file content-type wins over
-    // the type token so we never treat a file as a folder.
-    bool isDir = typeToken.contains(QStringLiteral("directory"));
-    if (hasTarget) {
-        isDir = !contentType.contains(QStringLiteral("regular"));
-    }
+    // Discovery shortcuts and mountable share roots are directories in
+    // practice. A regular entry with a target stays a file: recent:///
+    // lists its files with a target-uri pointing at the real file.
+    const bool isDir = typeToken.contains(QStringLiteral("directory"))
+        || (hasTarget && (typeToken.contains(QStringLiteral("shortcut"))
+                          || typeToken.contains(QStringLiteral("mountable"))));
 
     const QString displayName = attrs.value(QStringLiteral("standard::display-name"), locationFileName(uri));
     const int unixMode = attrs.value(QStringLiteral("unix::mode")).toInt();
@@ -1418,25 +1416,26 @@ void FileSystemModel::reloadRemote()
 
     setIsLoading(true);
 
-    const int generation = m_remoteReloadGeneration;
-    const QString rootPath = m_rootPath;
+    startRemoteList(m_rootPath, m_remoteReloadGeneration, false);
+}
 
-    // Mount first so `gio list` can enumerate. Server roots (smb://host/)
-    // list without an explicit mount, but share paths (smb://host/share/)
-    // need a gvfs mount to exist. With credentials cached in the keyring
-    // this returns immediately; if credentials are missing it exits fast
-    // and the list below still runs (showing an error or the browse view).
+// Share paths (smb://host/share/) need a gvfs mount before `gio list` can
+// enumerate them, so a failed list mounts the location and lists once more.
+// Already-mounted paths never pay for the extra process.
+void FileSystemModel::startRemoteMount(const QString &rootPath, int generation)
+{
     auto *mountProc = new QProcess(this);
     m_remoteReloadProcess = mountProc;
+    // Without keyring credentials gio mount prompts on stdin; EOF makes it
+    // give up at once instead of waiting for the kill timer.
+    mountProc->setStandardInputFile(QProcess::nullDevice());
     connect(mountProc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, [this, mountProc, generation, rootPath](int, QProcess::ExitStatus) {
-        if (mountProc != m_remoteReloadProcess || generation != m_remoteReloadGeneration) {
-            mountProc->deleteLater();
-            return;
-        }
         mountProc->deleteLater();
+        if (mountProc != m_remoteReloadProcess || generation != m_remoteReloadGeneration)
+            return;
         m_remoteReloadProcess = nullptr;
-        startRemoteList(rootPath, generation);
+        startRemoteList(rootPath, generation, true);
     });
     startHostToolProcess(mountProc, QStringLiteral("gio"),
                          {QStringLiteral("mount"), gioLocationArg(rootPath)});
@@ -1449,7 +1448,7 @@ void FileSystemModel::reloadRemote()
     });
 }
 
-void FileSystemModel::startRemoteList(const QString &rootPath, int generation)
+void FileSystemModel::startRemoteList(const QString &rootPath, int generation, bool afterMount)
 {
     QStringList args = {
         QStringLiteral("list"),
@@ -1466,9 +1465,18 @@ void FileSystemModel::startRemoteList(const QString &rootPath, int generation)
     m_remoteReloadProcess = process;
 
     connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-            this, [this, process, generation, rootPath](int exitCode, QProcess::ExitStatus) {
+            this, [this, process, generation, rootPath, afterMount](int exitCode, QProcess::ExitStatus status) {
         if (process != m_remoteReloadProcess || generation != m_remoteReloadGeneration) {
             process->deleteLater();
+            return;
+        }
+
+        // A crash or the timeout kill is not a missing mount; retrying would
+        // only double the wait.
+        if (exitCode != 0 && status == QProcess::NormalExit && !afterMount) {
+            process->deleteLater();
+            m_remoteReloadProcess = nullptr;
+            startRemoteMount(rootPath, generation);
             return;
         }
 
