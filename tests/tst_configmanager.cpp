@@ -343,6 +343,19 @@ private slots:
         QCOMPARE(mgr2.savedSplits(), mgr.savedSplits());
     }
 
+    void testSplitOrientationSetting()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.path() + "/config.toml";
+        ConfigManager mgr(path);
+        QCOMPARE(mgr.splitOrientation(), QStringLiteral("vertical"));
+        mgr.saveSettings({{"splitOrientation", "horizontal"}});
+        QCOMPARE(mgr.splitOrientation(), QStringLiteral("horizontal"));
+        mgr.saveSettings({{"splitOrientation", "diagonal"}});   // ignored
+        ConfigManager mgr2(path);
+        QCOMPARE(mgr2.splitOrientation(), QStringLiteral("horizontal"));
+    }
+
     void testBookmarkNamesRoundTrip()
     {
         QTemporaryDir dir;

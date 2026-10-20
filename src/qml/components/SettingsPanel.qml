@@ -88,6 +88,7 @@ Window {
     readonly property var quickAccessNames: ["Home", "Recents", "Trash", "Network", "Pictures", "Downloads"]
     property var draftHiddenQuickAccess: config.hiddenQuickAccess
     property string draftSidebarPosition: config.sidebarPosition
+    property string draftSplitOrientation: config.splitOrientation
     property int draftSidebarWidth: currentSidebarWidth
     property int draftSidebarAutoHideWidth: config.sidebarAutoHideWidth
     property int draftRadiusSmall: config.radiusSmall
@@ -273,6 +274,7 @@ Window {
         draftSidebarVisible = true
         draftHiddenQuickAccess = []
         draftSidebarPosition = defaultSidebarPosition
+        draftSplitOrientation = "vertical"
         draftSidebarWidth = defaultSidebarWidth
         draftSidebarAutoHideWidth = defaultSidebarAutoHideWidth
         draftRadiusSmall = defaultRadiusSmall
@@ -321,6 +323,7 @@ Window {
             draftSidebarVisible = currentSidebarVisible
             draftHiddenQuickAccess = config.hiddenQuickAccess
             draftSidebarPosition = config.sidebarPosition
+            draftSplitOrientation = config.splitOrientation
             draftSidebarWidth = currentSidebarWidth
             draftSidebarAutoHideWidth = config.sidebarAutoHideWidth
             draftRadiusSmall = config.radiusSmall
@@ -395,6 +398,7 @@ Window {
             sidebarVisible: draftSidebarVisible,
             hiddenQuickAccess: draftHiddenQuickAccess,
             sidebarPosition: draftSidebarPosition,
+            splitOrientation: draftSplitOrientation,
             sidebarWidth: draftSidebarWidth,
             sidebarAutoHideWidth: draftSidebarAutoHideWidth,
             radiusSmall: draftRadiusSmall,
@@ -717,6 +721,16 @@ Window {
                 checked: root.draftSingleClickOpensFolders
                 onToggled: (value) => {
                     root.draftSingleClickOpensFolders = value
+                    root.applySettingsNow()
+                }
+            }
+
+            Q.Toggle {
+                Layout.fillWidth: true
+                label: "Split view top and bottom"
+                checked: root.draftSplitOrientation === "horizontal"
+                onToggled: (value) => {
+                    root.draftSplitOrientation = value ? "horizontal" : "vertical"
                     root.applySettingsNow()
                 }
             }

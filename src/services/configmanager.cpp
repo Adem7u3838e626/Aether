@@ -1171,6 +1171,14 @@ void ConfigManager::saveSettings(const QVariantMap &settings)
         general.insert_or_assign("font_family", m_fontFamily.toStdString());
     }
 
+    if (settings.contains("splitOrientation")) {
+        const QString orientation = settings.value("splitOrientation").toString();
+        if (orientation == QLatin1String("horizontal") || orientation == QLatin1String("vertical")) {
+            m_splitOrientation = orientation;
+            general.insert_or_assign("split_orientation", orientation.toStdString());
+        }
+    }
+
     if (settings.contains("showHidden")) {
         m_showHidden = settings.value("showHidden").toBool();
         general.insert_or_assign("show_hidden", m_showHidden);
