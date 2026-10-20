@@ -4176,31 +4176,43 @@ ApplicationWindow {
                     }
                 }
 
-                GridLayout {
+                Item {
                     id: paneRow
                     anchors.fill: parent
                     anchors.margins: 8 * root.splitTransitionProgress
                     readonly property real spacing: 8 * root.splitTransitionProgress
-                    rowSpacing: spacing
-                    columnSpacing: spacing
-                    columns: root.isSplitHorizontal ? 1 : 3
-                    rows: root.isSplitHorizontal ? 3 : 1
-
                     readonly property real dividerWidth: root.splitTransitionProgress
-                    readonly property real secondaryPreferredWidth: root.isSplitHorizontal ? -1 : Math.max(
-                        0,
-                        (width - spacing - dividerWidth) * 0.5 * root.splitTransitionProgress
-                    )
-                    readonly property real secondaryPreferredHeight: root.isSplitHorizontal ? Math.max(
-                        0,
-                        (height - spacing - dividerWidth) * 0.5 * root.splitTransitionProgress
-                    ) : -1
+                    readonly property real gap: 2 * spacing + dividerWidth
+
+                    // Pane sizes for each orientation; the secondary pane grows
+                    // in from zero while the split opens.
+                    readonly property real secondaryWidth: Math.max(
+                        0, (width - spacing - dividerWidth) * 0.5 * root.splitTransitionProgress)
+                    readonly property real secondaryHeight: Math.max(
+                        0, (height - spacing - dividerWidth) * 0.5 * root.splitTransitionProgress)
+                    readonly property real primaryWidth: width - gap - secondaryWidth
+                    readonly property real primaryHeight: height - gap - secondaryHeight
+
+                    // 0 = side by side, 1 = top and bottom. The switch folds in
+                    // two steps so the panes never overlap: the secondary pane
+                    // drops into the bottom-right quarter, then both panes
+                    // stretch to the full width. Going back runs it in reverse.
+                    property real orientationProgress: root.isSplitHorizontal ? 1 : 0
+                    Behavior on orientationProgress {
+                        NumberAnimation {
+                            duration: Theme.animDurationSlow
+                            easing.type: Theme.animEasingTransition; easing.bezierCurve: Theme.animBezierCurve
+                        }
+                    }
+                    readonly property real foldDown: Math.min(1, orientationProgress * 2)
+                    readonly property real foldAcross: Math.max(0, orientationProgress * 2 - 1)
+                    function mix(from, to, t) { return from + (to - from) * t }
 
                     Rectangle {
                         id: primaryPaneFrame
                         objectName: "primaryPaneFrame"
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
+                        width: paneRow.mix(paneRow.primaryWidth, paneRow.width, paneRow.foldAcross)
+                        height: paneRow.mix(paneRow.height, paneRow.primaryHeight, paneRow.foldDown)
                         radius: Theme.radiusMedium * root.splitTransitionProgress
                         clip: true
                         // Fill stays opaque the entire time so the pane never
@@ -4264,11 +4276,14 @@ ApplicationWindow {
                         id: dividerLoader
                         active: root.splitViewPresented
                         visible: active
-                        Layout.preferredWidth: root.isSplitHorizontal ? -1 : paneRow.dividerWidth
-                        Layout.preferredHeight: root.isSplitHorizontal ? paneRow.dividerWidth : -1
-                        Layout.fillWidth: root.isSplitHorizontal
-                        Layout.fillHeight: !root.isSplitHorizontal
-                        opacity: root.splitTransitionProgress
+                        readonly property bool across: paneRow.orientationProgress >= 0.5
+                        x: across ? 0 : paneRow.primaryWidth + paneRow.spacing
+                        y: across ? paneRow.primaryHeight + paneRow.spacing : 0
+                        width: across ? paneRow.width : paneRow.dividerWidth
+                        height: across ? paneRow.dividerWidth : paneRow.height
+                        // Hidden mid-fold, where neither position fits.
+                        opacity: paneRow.orientationProgress === 0 || paneRow.orientationProgress === 1
+                            ? root.splitTransitionProgress : 0
 
                         sourceComponent: Rectangle {
                             anchors.fill: parent
@@ -4283,12 +4298,10 @@ ApplicationWindow {
                         visible: active
                         enabled: root.splitViewEnabled()
                         opacity: root.splitTransitionProgress
-                        Layout.preferredWidth: paneRow.secondaryPreferredWidth
-                        Layout.preferredHeight: paneRow.secondaryPreferredHeight
-                        // Only the primary pane fills along the split axis;
-                        // filling here too collapsed it in the vertical split.
-                        Layout.fillWidth: root.isSplitHorizontal
-                        Layout.fillHeight: !root.isSplitHorizontal
+                        x: paneRow.mix(paneRow.primaryWidth + paneRow.gap, 0, paneRow.foldAcross)
+                        y: paneRow.mix(0, paneRow.primaryHeight + paneRow.gap, paneRow.foldDown)
+                        width: paneRow.mix(paneRow.secondaryWidth, paneRow.width, paneRow.foldAcross)
+                        height: paneRow.mix(paneRow.height, paneRow.secondaryHeight, paneRow.foldDown)
 
                         sourceComponent: Rectangle {
                             id: secondaryPaneFrame

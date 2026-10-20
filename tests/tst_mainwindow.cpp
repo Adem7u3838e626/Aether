@@ -656,10 +656,10 @@ private slots:
         QVERIFY(primary->x() < secondary->x());
 
         QVERIFY(QMetaObject::invokeMethod(root, "toggleSplitOrientation"));
-        app.window->grabWindow();
-        QTRY_VERIFY(primary->y() < secondary->y());
+        // Equal widths only once the fold animation has finished.
+        QTRY_COMPARE(primary->width(), secondary->width());
+        QVERIFY(primary->y() < secondary->y());
         QVERIFY(halves(primary->height(), secondary->height()));
-        QCOMPARE(primary->width(), secondary->width());
     }
 
     // A tab with no orientation of its own follows split_orientation, so the
