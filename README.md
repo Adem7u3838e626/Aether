@@ -6,16 +6,16 @@
 
 **A fast, keyboard-friendly file manager for Hyprland and Wayland desktops.**
 
-[![License](https://img.shields.io/github/license/Adem7u3838e626/hyprfm?style=flat-square)](LICENSE)
-[![Release](https://img.shields.io/github/v/release/Adem7u3838e626/hyprfm?style=flat-square)](https://github.com/Adem7u3838e626/hyprfm/releases)
+[![License](https://img.shields.io/github/license/Adem7u3838e626/Aether?style=flat-square)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/Adem7u3838e626/Aether?style=flat-square)](https://github.com/Adem7u3838e626/Aether/releases)
 [![AUR](https://img.shields.io/aur/version/aether-git?style=flat-square&logo=arch-linux)](https://aur.archlinux.org/packages/aether-git)
-[![Build](https://img.shields.io/github/actions/workflow/status/Adem7u3838e626/hyprfm/build.yml?style=flat-square)](https://github.com/Adem7u3838e626/hyprfm/actions)
+[![Build](https://img.shields.io/github/actions/workflow/status/Adem7u3838e626/Aether/build.yml?style=flat-square)](https://github.com/Adem7u3838e626/Aether/actions)
 
 </div>
 
 ---
 
-Aether is a Qt6/QML file manager designed to feel native on Hyprland: lightweight, themeable, and built around fast keyboard navigation. It pairs a polished UI with the practical features power users expect, including Miller column view, kinetic scrolling, drag & drop, async operations, rich previews, and a TOML-based theme system.
+Aether is a continuing fork of [HyprFM](https://github.com/Adem7u3838e626/hyprfm), built with Qt 6 and QML for Hyprland and other Wayland desktops. It keeps the fast, keyboard-first file management experience and adds features such as configurable Vim navigation and cloud drive mounting. The project is actively evolving, with a plugin system planned as a major next step.
 
 <div align="center">
 
@@ -47,6 +47,7 @@ Aether is a Qt6/QML file manager designed to feel native on Hyprland: lightweigh
   - [File operations](#file-operations)
   - [Look & feel](#look--feel)
   - [Integrations](#integrations)
+- [🗺 Roadmap](#-roadmap)
 - [📦 Installation](#-installation)
   - [Arch Linux (AUR)](#arch-linux-aur)
   - [Flatpak (self-hosted)](#flatpak-self-hosted)
@@ -87,7 +88,7 @@ Aether is a Qt6/QML file manager designed to feel native on Hyprland: lightweigh
 
 ### Navigation & input
 
-- **Full keyboard navigation**: arrows, vim-friendly shortcuts, type-ahead search
+- **Full keyboard navigation**: arrows, optional Vim-style `h/j/k/l` movement, and type-ahead search
 - **Tabs** with independent history per pane
 - **Path bar** with breadcrumbs and inline editing (`Ctrl+L`)
 - **Bookmarks sidebar** with drag-to-reorder, inline rename, and udisks2 device mounting
@@ -115,6 +116,7 @@ Aether is a Qt6/QML file manager designed to feel native on Hyprland: lightweigh
 
 - **udisks2** mount/unmount of removable drives
 - **gvfs / gio** for SFTP, SMB and MTP (the trash is read directly and does not need it)
+- **Cloud drives** through rclone, with an in-app setup flow for Google Drive, Dropbox, OneDrive, Nextcloud, and S3-compatible storage
 - **Git status overlays** in file lists (modified, staged, untracked, …)
 - **wl-clipboard** for the system clipboard on Wayland
 - **bat** for syntax-highlighted text previews
@@ -122,10 +124,50 @@ Aether is a Qt6/QML file manager designed to feel native on Hyprland: lightweigh
 - **ffmpeg** for video poster thumbnails
 - **Poppler** for PDF page previews
 
+Cloud drive support requires `rclone`. Configure a remote in Aether’s sidebar and mount it like a regular location. The setup flow stores credentials through rclone; availability and supported features depend on the selected provider and rclone configuration.
+
+<div align="center">
+
+![Cloud storage setup](docs/screenshots/cloud-storage.png)
+*Add and manage cloud drives from the sidebar*
+
+</div>
+
+The Vim navigation option is available in Settings → Layout. It adds `h/j/k/l` movement to the file views and can be turned off at any time.
+
+<div align="center">
+
+![Vim navigation](docs/screenshots/vimmotions.png)
+*Optional Vim-style navigation controls*
+
+</div>
+
 <div align="center">
 
 ![Quick preview](docs/screenshots/quick-preview.png)
 *Quick preview overlay (Space): image preview with full metadata sidebar*
+
+</div>
+
+---
+
+## 🗺 Roadmap
+
+Aether is under active development. The next major goal is a plugin system that lets users extend the file manager while keeping the core focused and maintainable. The Plugins page currently shows a placeholder; Aether does **not** load third-party extensions yet.
+
+Planned work:
+
+- Define a documented extension API and its supported capabilities.
+- Add plugin discovery and basic management in Settings.
+- Provide a small example plugin and guidance for plugin authors.
+- Continue improving cloud storage, keyboard navigation, and the everyday file management experience alongside that work.
+
+These are project goals, not release promises or a fixed schedule. The plugin design preview below shows the current placeholder page, not a working plugin manager.
+
+<div align="center">
+
+![Plugins page design preview](docs/screenshots/pluguinmanager-bita.png)
+*Current Plugins settings placeholder; extension support is planned*
 
 </div>
 
@@ -167,14 +209,14 @@ The script creates a self-contained `Aether-<version>-x86_64.AppImage`.
 ### Nix (flake)
 
 ```bash
-nix run github:Adem7u3838e626/hyprfm
+nix run github:Adem7u3838e626/Aether
 ```
 
 Or pull it into a system/home-manager flake:
 
 ```nix
 {
-  inputs.aether.url = "github:Adem7u3838e626/hyprfm";
+  inputs.aether.url = "github:Adem7u3838e626/Aether";
 }
 ```
 
@@ -199,7 +241,7 @@ connect to. On a non-NixOS host the distro's own gvfs covers this.
 ### Build from source
 
 ```bash
-git clone --recursive https://github.com/Adem7u3838e626/hyprfm.git aether
+git clone --recursive https://github.com/Adem7u3838e626/Aether.git aether
 cd aether
 cmake -B build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
@@ -227,7 +269,7 @@ The result lands in the repo root as `Aether-<version>-x86_64.AppImage`. The scr
 | **Required (build)** | `cmake`, `ninja`, `qt6-base`, `qt6-declarative`, `qt6-svg` |
 | **Required (runtime)** | `qt6-base`, `qt6-declarative`, `qt6-svg`, `qt6-wayland`, `glib2`, `xdg-utils` |
 | **Archives** | `tar`, `gzip`, `bzip2`, `xz`, `zstd`, `zip`, `unzip`, `p7zip` (`7z`), `libarchive` (`bsdtar`). Compress and extract call these by name, so a missing one only breaks that format. |
-| **Optional** | `kwindowsystem` / `KF6WindowSystem` (native KDE blur), `wl-clipboard` (clipboard on Wayland), `fd` (fast search), `bat` (syntax highlighting), `md4c` (rendered Markdown previews via `md2html`; see the note below), `git` (git status overlays), `gvfs` (SFTP/SMB/MTP; not needed for the trash), `gvfs-smb` (SMB), `gvfs-mtp` (Android/MTP phones), `ffmpeg` (video thumbnails), `exiftool` (metadata sidebar), `udisks2` (device mounting), `poppler` / `poppler-utils` (PDF previews via `pdftoppm`) |
+| **Optional** | `kwindowsystem` / `KF6WindowSystem` (native KDE blur), `wl-clipboard` (clipboard on Wayland), `fd` (fast search), `bat` (syntax highlighting), `md4c` (rendered Markdown previews via `md2html`; see the note below), `git` (git status overlays), `gvfs` (SFTP/SMB/MTP; not needed for the trash), `gvfs-smb` (SMB), `gvfs-mtp` (Android/MTP phones), `rclone` (cloud drives), `ffmpeg` (video thumbnails), `exiftool` (metadata sidebar), `udisks2` (device mounting), `poppler` / `poppler-utils` (PDF previews via `pdftoppm`) |
 
 A note on Markdown previews: `md2html` ships in the `md4c` package on Arch
 and Alpine, and in `pkgs.md4c` on Nix. Debian and Ubuntu package md4c's
