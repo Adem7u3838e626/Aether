@@ -409,6 +409,12 @@ ApplicationWindow {
         root.remoteConnectDialog.open()
     }
 
+    function openCloudDriveDialog() {
+        cloudDriveDialogLoader.active = true
+        root.cloudDriveDialog.resetForm()
+        root.cloudDriveDialog.open()
+    }
+
     function showQuickPreview(path) {
         quickPreviewLoader.active = true
         const preview = root.quickPreview
@@ -1242,6 +1248,7 @@ ApplicationWindow {
         if (!path)
             return
 
+        root.renameCloudRemoteName = ""
         root.renameTargetPath = path
         renameDialogLoader.active = true
         root.renameDialog.field.text = path.substring(path.lastIndexOf("/") + 1)
@@ -1498,6 +1505,20 @@ ApplicationWindow {
     }
     readonly property var remoteConnectDialog: remoteConnectDialogLoader.item
 
+    Loader {
+        id: cloudDriveDialogLoader
+        objectName: "cloudDriveDialogLoader"
+        anchors.fill: parent
+        z: 1000
+        active: false
+        sourceComponent: Component {
+            CloudDriveDialog {
+                objectName: "cloudDriveDialog"
+            }
+        }
+    }
+    readonly property var cloudDriveDialog: cloudDriveDialogLoader.item
+
     // Created the first time it opens: building it (and its dropdowns,
     // sliders and pages) at startup cost more than any other hidden piece of
     // the UI. Theme binds to config on its own, so nothing needs it earlier.
@@ -1563,6 +1584,7 @@ ApplicationWindow {
 
     // ── Rename dialog ───────────────────────────────────────────────────────
     property string renameTargetPath: ""
+    property string renameCloudRemoteName: ""
 
     Loader {
         id: renameDialogLoader
@@ -1596,6 +1618,14 @@ ApplicationWindow {
                 }
                 function accept() {
                     var name = renameField.text.trim()
+                    if (renameCloudRemoteName !== "") {
+                        var remote = root.renameCloudRemoteName
+                        root.renameCloudRemoteName = ""
+                        if (name !== "")
+                            rcloneService.renameRemote(remote, name)
+                        renameCloseAnim.start()
+                        return
+                    }
                     if (renameTargetPath === "" || name === "") return
                     var parentDir = fileOps.parentPath(renameTargetPath)
                     var targetPath = parentDir + "/" + name
@@ -1617,7 +1647,10 @@ ApplicationWindow {
                     }
                     renameCloseAnim.start()
                 }
-                function reject() { renameCloseAnim.start() }
+                function reject() {
+                    root.renameCloudRemoteName = ""
+                    renameCloseAnim.start()
+                }
 
                 ParallelAnimation {
                     id: renameOpenAnim
@@ -3272,18 +3305,30 @@ ApplicationWindow {
                 }
 
                 onSplitViewRequested: (path) => {
-                    if (path)
-                        root.openPathInSplitView(path)
+                    if (path) {
+                        if (sidebarItem.kind === "cloudRemote")
+                            root.ensureMountedAndRun(path, function() { root.openPathInSplitView(path) })
+                        else
+                            root.openPathInSplitView(path)
+                    }
                 }
 
                 onPropertiesRequested: (path) => {
-                    if (path)
-                        root.showPropertiesFor(path)
+                    if (path) {
+                        if (sidebarItem.kind === "cloudRemote")
+                            root.ensureMountedAndRun(path, function() { root.showPropertiesFor(path) })
+                        else
+                            root.showPropertiesFor(path)
+                    }
                 }
 
                 onOpenInTerminalRequested: (path) => {
-                    if (path)
-                        fileOps.openInTerminal(path)
+                    if (path) {
+                        if (sidebarItem.kind === "cloudRemote")
+                            root.ensureMountedAndRun(path, function() { fileOps.openInTerminal(path) })
+                        else
+                            fileOps.openInTerminal(path)
+                    }
                 }
 
                 onCustomActionRequested: (action) => {
@@ -3300,6 +3345,25 @@ ApplicationWindow {
                     } else if (action === "renamebookmark") {
                         if (sidebarItem.kind === "bookmark" && sidebarItem.index >= 0)
                             sidebarPanel.startBookmarkRename(sidebarItem.index)
+                    } else if (action === "renamecloudremote") {
+                        if (sidebarItem.kind === "cloudRemote" && sidebarItem.remoteName) {
+                            renameDialogLoader.active = true
+                            root.renameCloudRemoteName = sidebarItem.remoteName
+                            root.renameTargetPath = ""
+                            root.renameDialog.field.text = sidebarItem.remoteName
+                            root.renameDialog.open()
+                        }
+                    } else if (action === "remcloudremote") {
+                        if (sidebarItem.kind === "cloudRemote" && sidebarItem.remoteName)
+                            rcloneService.removeRemote(sidebarItem.remoteName)
+                    } else if (action === "copycloudremote") {
+                        if (sidebarItem.kind === "cloudRemote" && sidebarItem.remoteName) {
+                            const remote = sidebarItem.remoteName
+                            const path = rcloneService.getMountPath(remote)
+                            root.ensureMountedAndRun(path, function() {
+                                fileOps.copyFilesToFolder([path], "Copy ‘" + remote + "’ to a local folder")
+                            })
+                        }
                     } else if (action === "removebookmark") {
                         if (sidebarItem.kind === "bookmark" && sidebarItem.index >= 0)
                             bookmarks.removeBookmark(sidebarItem.index)
@@ -3773,6 +3837,22 @@ ApplicationWindow {
             ]
         }
 
+        if (item.kind === "cloudRemote") {
+            return [
+                { text: "Open", shortcut: config.shortcutMap["open"] || "Return", action: "open" },
+                { text: "Open in New Tab", shortcut: "", action: "opennewtab" },
+                { text: "Open in Split View", shortcut: "", action: "split_open", icon: "SquareSplitHorizontal" },
+                { separator: true },
+                { text: "Open in Terminal", shortcut: "", action: "terminal" },
+                { text: "Properties", shortcut: "", action: "properties" },
+                { separator: true },
+                { text: "Copy All to Local…", shortcut: "", action: "copycloudremote" },
+                { separator: true },
+                { text: "Rename", shortcut: "", action: "renamecloudremote" },
+                { text: "Remove Cloud Drive", shortcut: "", action: "remcloudremote", destructive: true }
+            ]
+        }
+
         if (item.kind === "savedSplit") {
             return [
                 { text: "Add Both Folders to Bookmarks", shortcut: "", action: "bookmark_saved_split", icon: "Bookmark" },
@@ -4002,6 +4082,7 @@ ApplicationWindow {
                     }
                     onCollapseClicked: root.toggleSidebar()
                     onFeatureHintRequested: (message) => toast.show(message, "info")
+                    onCloudDriveConnectRequested: root.openCloudDriveDialog()
                 }
 
                 MouseArea {
@@ -4515,6 +4596,14 @@ ApplicationWindow {
 
     Connections {
         target: rcloneService
+        function onConfigurationQuestion(remoteName, state, option, errorString) {
+            if (root.cloudDriveDialog)
+                root.cloudDriveDialog.receiveConfigurationQuestion(remoteName, state, option, errorString)
+        }
+        function onConfigurationFinished(remoteName, success, errorString) {
+            if (root.cloudDriveDialog)
+                root.cloudDriveDialog.finishConfiguration(remoteName, success, errorString)
+        }
         function onMountFinished(remoteName, success, error) {
             var remaining = []
             for (var i = 0; i < pendingCloudCallbacks.length; ++i) {
@@ -4531,6 +4620,15 @@ ApplicationWindow {
                 }
             }
             pendingCloudCallbacks = remaining
+        }
+        function onRemoteActionFinished(action, remoteName, success, errorString) {
+            if (success) {
+                toast.show(action === "rename"
+                    ? "Cloud drive renamed successfully"
+                    : "Cloud drive removed", "success")
+            } else {
+                toast.show(errorString || "Cloud drive action failed", "error")
+            }
         }
     }
 }

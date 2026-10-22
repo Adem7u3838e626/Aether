@@ -6,6 +6,10 @@ cd "$(dirname "$(readlink -f "$0")")"
 # Keep the desktop shell's QML modules out of HyprFM's Qt import scan.
 unset QML_IMPORT_PATH QML2_IMPORT_PATH
 
+# Run this fork as a separate app with its own settings, even when it is
+# launched by this script after a rebuild.
+export HYPRFM_CONFIG_DIR="${HYPRFM_CONFIG_DIR:-${HOME}/.config/hyprfm-expanded}"
+
 cmake -B build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DBUILD_TESTS=OFF

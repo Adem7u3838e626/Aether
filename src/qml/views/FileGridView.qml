@@ -179,6 +179,20 @@ GridView {
     Keys.onUpPressed: (event) => moveSelection(-effectiveColumnCount, event.modifiers & Qt.ShiftModifier)
     Keys.onDownPressed: (event) => moveSelection(effectiveColumnCount, event.modifiers & Qt.ShiftModifier)
     Keys.onPressed: (event) => {
+        if (config.vimNavigation
+                && (event.modifiers === Qt.NoModifier || event.modifiers === Qt.ShiftModifier)) {
+            var extendSelection = (event.modifiers & Qt.ShiftModifier) !== 0
+            var vimKeyHandled = true
+            if (event.key === Qt.Key_H) moveSelection(-1, extendSelection)
+            else if (event.key === Qt.Key_J) moveSelection(effectiveColumnCount, extendSelection)
+            else if (event.key === Qt.Key_K) moveSelection(-effectiveColumnCount, extendSelection)
+            else if (event.key === Qt.Key_L) moveSelection(1, extendSelection)
+            else vimKeyHandled = false
+            if (vimKeyHandled) {
+                event.accepted = true
+                return
+            }
+        }
         if (event.key === Qt.Key_Home) {
             moveSelectionTo(0, event.modifiers & Qt.ShiftModifier)
             event.accepted = true

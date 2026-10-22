@@ -307,6 +307,7 @@ void ConfigManager::setDefaults()
     m_hiddenLast = false;
     m_rightClickToEditPath = true;
     m_singleClickOpensFolders = false;
+    m_vimNavigation = false;
     m_sortBy = "name";
     m_sortAscending = true;
     m_rememberSortPerFolder = true;
@@ -388,6 +389,8 @@ void ConfigManager::loadConfig()
             m_rightClickToEditPath = *v;
         if (auto v = config["general"]["single_click_opens_folders"].value<bool>())
             m_singleClickOpensFolders = *v;
+        if (auto v = config["general"]["vim_navigation"].value<bool>())
+            m_vimNavigation = *v;
         if (auto v = config["general"]["dependency_startup_check"].value<bool>())
             m_dependencyStartupCheck = *v;
         if (auto v = config["general"]["sort_by"].value<std::string>())
@@ -663,6 +666,9 @@ right_click_to_edit_path = true
 # open on double-click; Ctrl/Shift+click still selects.
 single_click_opens_folders = false
 
+# Use h/j/k/l like the arrow keys while navigating file lists.
+vim_navigation = false
+
 # Sort order: "name" | "size" | "modified" | "type"
 sort_by = "name"
 sort_ascending = true
@@ -934,6 +940,7 @@ bool ConfigManager::showHidden() const { return m_showHidden; }
 bool ConfigManager::hiddenLast() const { return m_hiddenLast; }
 bool ConfigManager::rightClickToEditPath() const { return m_rightClickToEditPath; }
 bool ConfigManager::singleClickOpensFolders() const { return m_singleClickOpensFolders; }
+bool ConfigManager::vimNavigation() const { return m_vimNavigation; }
 bool ConfigManager::dependencyStartupCheck() const { return m_dependencyStartupCheck; }
 QString ConfigManager::sortBy() const { return m_sortBy; }
 bool ConfigManager::sortAscending() const { return m_sortAscending; }
@@ -1197,6 +1204,11 @@ void ConfigManager::saveSettings(const QVariantMap &settings)
     if (settings.contains("singleClickOpensFolders")) {
         m_singleClickOpensFolders = settings.value("singleClickOpensFolders").toBool();
         general.insert_or_assign("single_click_opens_folders", m_singleClickOpensFolders);
+    }
+
+    if (settings.contains("vimNavigation")) {
+        m_vimNavigation = settings.value("vimNavigation").toBool();
+        general.insert_or_assign("vim_navigation", m_vimNavigation);
     }
 
     if (settings.contains("dependencyStartupCheck")) {

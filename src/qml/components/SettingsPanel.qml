@@ -82,6 +82,7 @@ Window {
     property bool draftHiddenLast: config.hiddenLast
     property bool draftRightClickToEditPath: config.rightClickToEditPath
     property bool draftSingleClickOpensFolders: config.singleClickOpensFolders
+    property bool draftVimNavigation: config.vimNavigation
     property bool draftDependencyStartupCheck: config.dependencyStartupCheck
     property bool draftSidebarVisible: currentSidebarVisible
     // Must stay in sync with the quick-access entries in Sidebar.qml.
@@ -156,6 +157,7 @@ Window {
     Component { id: layoutSectionIcon; IconPanelLeft {} }
     Component { id: motionSectionIcon; IconClock {} }
     Component { id: toolsSectionIcon; IconFolder {} }
+    Component { id: pluginsSectionIcon; IconPackageOpen {} }
 
     property int currentSectionIndex: 0
     readonly property bool compactNavigation: dialogWidth < 860
@@ -163,13 +165,15 @@ Window {
         { title: "Look & Feel", iconComponent: paletteSectionIcon },
         { title: "Layout", iconComponent: layoutSectionIcon },
         { title: "Motion", iconComponent: motionSectionIcon },
-        { title: "Tools", iconComponent: toolsSectionIcon }
+        { title: "Tools", iconComponent: toolsSectionIcon },
+        { title: "Plugins", iconComponent: pluginsSectionIcon }
     ]
     readonly property var sectionItems: [
         { title: "Look & Feel", subtitle: "Theme, typography, icons, and surface styling.", iconComponent: paletteSectionIcon },
         { title: "Layout", subtitle: "Sidebar behavior, file visibility, and toolbar controls.", iconComponent: layoutSectionIcon },
         { title: "Motion", subtitle: "Animation timing and easing across the interface.", iconComponent: motionSectionIcon },
-        { title: "Tools", subtitle: "Shortcuts, remote locations, and config behavior.", iconComponent: toolsSectionIcon }
+        { title: "Tools", subtitle: "Shortcuts, remote locations, and config behavior.", iconComponent: toolsSectionIcon },
+        { title: "Plugins", subtitle: "Optional extensions for HyprFM.", iconComponent: pluginsSectionIcon }
     ]
 
     function showSection(index) {
@@ -270,6 +274,7 @@ Window {
         draftHiddenLast = false
         draftRightClickToEditPath = true
         draftSingleClickOpensFolders = false
+        draftVimNavigation = false
         draftDependencyStartupCheck = true
         draftSidebarVisible = true
         draftHiddenQuickAccess = []
@@ -319,6 +324,7 @@ Window {
             draftHiddenLast = config.hiddenLast
             draftRightClickToEditPath = config.rightClickToEditPath
             draftSingleClickOpensFolders = config.singleClickOpensFolders
+            draftVimNavigation = config.vimNavigation
             draftDependencyStartupCheck = config.dependencyStartupCheck
             draftSidebarVisible = currentSidebarVisible
             draftHiddenQuickAccess = config.hiddenQuickAccess
@@ -394,6 +400,7 @@ Window {
             hiddenLast: draftHiddenLast,
             rightClickToEditPath: draftRightClickToEditPath,
             singleClickOpensFolders: draftSingleClickOpensFolders,
+            vimNavigation: draftVimNavigation,
             dependencyStartupCheck: draftDependencyStartupCheck,
             sidebarVisible: draftSidebarVisible,
             hiddenQuickAccess: draftHiddenQuickAccess,
@@ -721,6 +728,16 @@ Window {
                 checked: root.draftSingleClickOpensFolders
                 onToggled: (value) => {
                     root.draftSingleClickOpensFolders = value
+                    root.applySettingsNow()
+                }
+            }
+
+            Q.Toggle {
+                Layout.fillWidth: true
+                label: "Use Vim navigation keys (h/j/k/l)"
+                checked: root.draftVimNavigation
+                onToggled: (value) => {
+                    root.draftVimNavigation = value
                     root.applySettingsNow()
                 }
             }
@@ -1217,6 +1234,55 @@ Window {
         }
     }
 
+    Component {
+        id: pluginsPageComponent
+
+        ColumnLayout {
+            width: pageLoader.width
+            spacing: 12
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                implicitHeight: 196
+                radius: Theme.radiusMedium
+                color: Theme.containerColor(Theme.surface, 0.22)
+                border.width: 1
+                border.color: root.sectionBorderColor
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 20
+                    spacing: 10
+
+                    IconPackageOpen {
+                        Layout.alignment: Qt.AlignHCenter
+                        size: 28
+                        color: Theme.subtext
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: "Plugins are not supported yet"
+                        color: Theme.text
+                        font.pointSize: Theme.fontNormal
+                        font.bold: true
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: "HyprFM does not currently load third-party extensions. This page will show plugin discovery and controls once extension support is available."
+                        color: Theme.subtext
+                        font.pointSize: Theme.fontSmall
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.WordWrap
+                    }
+                }
+            }
+        }
+    }
+
     Item {
         id: pageContainer
         anchors.fill: parent
@@ -1374,7 +1440,9 @@ Window {
                                             ? layoutPageComponent
                                             : root.currentSectionIndex === 2
                                                 ? motionPageComponent
-                                                : toolsPageComponent
+                                                : root.currentSectionIndex === 3
+                                                    ? toolsPageComponent
+                                                    : pluginsPageComponent
                                 }
                             }
                         }

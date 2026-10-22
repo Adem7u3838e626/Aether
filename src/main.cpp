@@ -682,9 +682,9 @@ int main(int argc, char *argv[])
     RendererChoice renderer;
 
     QGuiApplication app(argc, argv);
-    app.setApplicationName("HyprFM");
-    app.setOrganizationName("hyprfm");
-    app.setDesktopFileName("hyprfm");
+    app.setApplicationName("HyprFM Expanded");
+    app.setOrganizationName("hyprfm-expanded");
+    app.setDesktopFileName("hyprfm-expanded");
 
     // Startup timing: opt-in via HYPRFM_TIMING=1 so normal runs stay quiet.
     // Prints milliseconds from QGuiApplication construction at each phase.
@@ -728,7 +728,7 @@ int main(int argc, char *argv[])
     // launch would then hand its path to their server and quit.
     const QString hyprfmSocketName =
         QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation)
-        + QStringLiteral("/hyprfm.sock");
+        + QStringLiteral("/hyprfm-expanded.sock");
     QLocalServer *ipcServer = nullptr;
     bool isPrimary = false;
     {
@@ -806,15 +806,10 @@ int main(int argc, char *argv[])
         return font;
     };
 
-    // $XDG_CONFIG_HOME/hyprfm (~/.config/hyprfm when unset). Not under
-    // Flatpak: the runtime points XDG_CONFIG_HOME at a per-app directory, and
-    // Flatpak installs have always kept their config in the real
-    // ~/.config/hyprfm, so following it there would lose it.
-    const bool inFlatpak = QFile::exists(QStringLiteral("/.flatpak-info"));
-    const QString configDir = (inFlatpak
-            ? QDir::homePath() + QStringLiteral("/.config")
-            : QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation))
-        + QStringLiteral("/hyprfm");
+    // Keep this fork's settings separate from the installed HyprFM app.
+    const QString defaultConfigDir = QDir::homePath()
+        + QStringLiteral("/.config/hyprfm-expanded");
+    const QString configDir = qEnvironmentVariable("HYPRFM_CONFIG_DIR", defaultConfigDir);
     QDir().mkpath(configDir);
     const QString configPath = configDir + "/config.toml";
 

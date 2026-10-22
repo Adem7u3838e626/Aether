@@ -789,6 +789,30 @@ FocusScope {
                 event.accepted = true
             }
             Keys.onPressed: (event) => {
+                if (config.vimNavigation
+                        && (event.modifiers === Qt.NoModifier || event.modifiers === Qt.ShiftModifier)) {
+                    var extendSelection = (event.modifiers & Qt.ShiftModifier) !== 0
+                    if (event.key === Qt.Key_H) {
+                        root.goUp()
+                        event.accepted = true
+                        return
+                    }
+                    if (event.key === Qt.Key_L) {
+                        activateCurrentSelection()
+                        event.accepted = true
+                        return
+                    }
+                    if (event.key === Qt.Key_J) {
+                        moveSelection(1, extendSelection)
+                        event.accepted = true
+                        return
+                    }
+                    if (event.key === Qt.Key_K) {
+                        moveSelection(-1, extendSelection)
+                        event.accepted = true
+                        return
+                    }
+                }
                 if (event.key === Qt.Key_Home) {
                     moveSelectionTo(0, event.modifiers & Qt.ShiftModifier)
                     event.accepted = true

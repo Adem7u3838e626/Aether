@@ -3,7 +3,10 @@
 #include "services/cloudmounts.h"
 
 #include <QDir>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QPointer>
+#include <QRegularExpression>
 #include <QStandardPaths>
 #include <QTimer>
 #include <QDebug>
@@ -17,6 +20,8 @@ RcloneService::RcloneService(QObject *parent)
     m_rcloneAvailable = checkRcloneAvailable();
     m_mountsBaseDir = cloudMountsBaseDir();
     ensureMountsBaseDirExists();
+    if (m_rcloneAvailable)
+        refreshRemotes();
 }
 
 RcloneService::~RcloneService()
@@ -47,6 +52,294 @@ bool RcloneService::rcloneAvailable() const
 QStringList RcloneService::activeMounts() const
 {
     return m_processes.keys();
+}
+
+QStringList RcloneService::remoteNames() const
+{
+    return m_remoteNames;
+}
+
+bool RcloneService::configurationBusy() const
+{
+    return m_configurationBusy;
+}
+
+void RcloneService::refreshRemotes()
+{
+    if (!m_rcloneAvailable)
+        return;
+
+    QProcess *proc = new QProcess(this);
+    connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this,
+            [this, proc](int exitCode, QProcess::ExitStatus status) {
+        if (status == QProcess::NormalExit && exitCode == 0) {
+            QStringList names;
+            const QString output = QString::fromUtf8(proc->readAllStandardOutput());
+            for (QString name : output.split(QLatin1Char('\n'), Qt::SkipEmptyParts)) {
+                name = name.trimmed();
+                if (name.endsWith(QLatin1Char(':')))
+                    name.chop(1);
+                if (!name.isEmpty())
+                    names.append(name);
+            }
+            names.removeDuplicates();
+            names.sort(Qt::CaseInsensitive);
+            if (names != m_remoteNames) {
+                m_remoteNames = names;
+                emit remoteNamesChanged();
+            }
+        }
+        proc->deleteLater();
+    });
+    connect(proc, &QProcess::errorOccurred, proc, &QObject::deleteLater);
+    proc->start(QStringLiteral("rclone"), {QStringLiteral("listremotes")});
+}
+
+void RcloneService::beginConfiguration(const QString &remoteName, const QString &backend)
+{
+    static const QStringList supportedBackends = {
+        QStringLiteral("drive"), QStringLiteral("dropbox"), QStringLiteral("onedrive"),
+        QStringLiteral("webdav"), QStringLiteral("s3")
+    };
+
+    const QString name = remoteName.trimmed();
+    if (!m_rcloneAvailable) {
+        emit configurationFinished(name, false, QStringLiteral("rclone is not installed."));
+        return;
+    }
+    if (m_configurationBusy) {
+        emit configurationFinished(name, false, QStringLiteral("Another rclone setup is already running."));
+        return;
+    }
+    if (name.isEmpty() || !QRegularExpression(QStringLiteral("^[A-Za-z0-9_.-]+$")).match(name).hasMatch()) {
+        emit configurationFinished(name, false,
+                                   QStringLiteral("Use a remote name containing only letters, numbers, dots, dashes, or underscores."));
+        return;
+    }
+    if (m_remoteNames.contains(name, Qt::CaseInsensitive)) {
+        emit configurationFinished(name, false, QStringLiteral("A remote with that name already exists."));
+        return;
+    }
+    if (!supportedBackends.contains(backend)) {
+        emit configurationFinished(name, false, QStringLiteral("Unsupported cloud provider."));
+        return;
+    }
+
+    m_configurationRemoteName = name;
+    m_configurationBackend = backend;
+    m_configurationState.clear();
+    runConfigurationCommand({QStringLiteral("config"), QStringLiteral("create"), name, backend,
+                             QStringLiteral("--non-interactive")});
+}
+
+void RcloneService::continueConfiguration(const QString &state, const QString &result)
+{
+    if (m_configurationRemoteName.isEmpty() || m_configurationBusy || state.isEmpty())
+        return;
+    if (state != m_configurationState) {
+        emit configurationFinished(m_configurationRemoteName, false,
+                                   QStringLiteral("The rclone setup state changed. Start the setup again."));
+        return;
+    }
+
+    runConfigurationCommand({QStringLiteral("config"), QStringLiteral("create"),
+                             m_configurationRemoteName, m_configurationBackend,
+                             QStringLiteral("--continue"), QStringLiteral("--state"), state,
+                             QStringLiteral("--result"), result, QStringLiteral("--non-interactive")});
+}
+
+void RcloneService::cancelConfiguration()
+{
+    if (m_configurationProcess && m_configurationProcess->state() != QProcess::NotRunning)
+        m_configurationProcess->kill();
+    m_configurationRemoteName.clear();
+    m_configurationBackend.clear();
+    m_configurationState.clear();
+}
+
+void RcloneService::renameRemote(const QString &remoteName, const QString &newName)
+{
+    const QString oldName = remoteName.trimmed();
+    const QString name = newName.trimmed();
+    static const QRegularExpression validName(QStringLiteral("^[A-Za-z0-9_.+@ -]+$"));
+    if (!m_rcloneAvailable || !m_remoteNames.contains(oldName)) {
+        emit remoteActionFinished(QStringLiteral("rename"), oldName, false,
+                                  QStringLiteral("Cloud drive was not found."));
+        return;
+    }
+    if (name.isEmpty() || name.startsWith(QLatin1Char('-')) || name.startsWith(QLatin1Char(' '))
+        || name.endsWith(QLatin1Char(' ')) || !validName.match(name).hasMatch()) {
+        emit remoteActionFinished(QStringLiteral("rename"), oldName, false,
+                                  QStringLiteral("That cloud drive name is not valid."));
+        return;
+    }
+    if (name == oldName) {
+        emit remoteActionFinished(QStringLiteral("rename"), oldName, true, QString());
+        return;
+    }
+    if (m_remoteNames.contains(name, Qt::CaseInsensitive)) {
+        emit remoteActionFinished(QStringLiteral("rename"), oldName, false,
+                                  QStringLiteral("A cloud drive with that name already exists."));
+        return;
+    }
+    if (m_processes.contains(oldName)) {
+        auto *connection = new QMetaObject::Connection;
+        *connection = connect(this, &RcloneService::unmountFinished, this,
+                              [this, oldName, name, connection](const QString &finishedRemote, bool success) {
+            if (finishedRemote != oldName)
+                return;
+            disconnect(*connection);
+            delete connection;
+            if (!success) {
+                emit remoteActionFinished(QStringLiteral("rename"), oldName, false,
+                                          QStringLiteral("Could not unmount the cloud drive."));
+                return;
+            }
+            renameRemote(oldName, name);
+        });
+        unmountRemote(oldName);
+        return;
+    }
+
+    auto *proc = new QProcess(this);
+    connect(proc, &QProcess::started, proc, [proc, oldName, name]() {
+        proc->write(QStringLiteral("r\n%1\n%2\nq\n").arg(oldName, name).toUtf8());
+    });
+    connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this,
+            [this, proc, oldName](int exitCode, QProcess::ExitStatus status) {
+        const QString output = QString::fromUtf8(proc->readAllStandardOutput()).trimmed();
+        const QString errorOutput = QString::fromUtf8(proc->readAllStandardError()).trimmed();
+        const bool success = status == QProcess::NormalExit && exitCode == 0
+            && !output.contains(QStringLiteral("Error:"), Qt::CaseInsensitive);
+        const QString error = !errorOutput.isEmpty() ? errorOutput
+            : (success ? QString() : (output.isEmpty() ? QStringLiteral("rclone could not rename this cloud drive.") : output));
+        proc->deleteLater();
+        if (success)
+            refreshRemotes();
+        emit remoteActionFinished(QStringLiteral("rename"), oldName, success, error);
+    });
+    connect(proc, &QProcess::errorOccurred, this, [this, proc, oldName](QProcess::ProcessError error) {
+        if (error != QProcess::FailedToStart)
+            return;
+        const QString message = proc->errorString();
+        proc->deleteLater();
+        emit remoteActionFinished(QStringLiteral("rename"), oldName, false, message);
+    });
+    proc->start(QStringLiteral("rclone"), {QStringLiteral("config")});
+}
+
+void RcloneService::removeRemote(const QString &remoteName)
+{
+    if (!m_rcloneAvailable || !m_remoteNames.contains(remoteName)) {
+        emit remoteActionFinished(QStringLiteral("remove"), remoteName, false,
+                                  QStringLiteral("Cloud drive was not found."));
+        return;
+    }
+    if (m_processes.contains(remoteName)) {
+        auto *connection = new QMetaObject::Connection;
+        *connection = connect(this, &RcloneService::unmountFinished, this,
+                              [this, remoteName, connection](const QString &finishedRemote, bool success) {
+            if (finishedRemote != remoteName)
+                return;
+            disconnect(*connection);
+            delete connection;
+            if (!success) {
+                emit remoteActionFinished(QStringLiteral("remove"), remoteName, false,
+                                          QStringLiteral("Could not unmount the cloud drive."));
+                return;
+            }
+            deleteRemoteConfig(remoteName);
+        });
+        unmountRemote(remoteName);
+        return;
+    }
+    deleteRemoteConfig(remoteName);
+}
+
+void RcloneService::deleteRemoteConfig(const QString &remoteName)
+{
+    auto *proc = new QProcess(this);
+    connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this,
+            [this, proc, remoteName](int exitCode, QProcess::ExitStatus status) {
+        const QString errorOutput = QString::fromUtf8(proc->readAllStandardError()).trimmed();
+        const bool success = status == QProcess::NormalExit && exitCode == 0;
+        proc->deleteLater();
+        if (success)
+            refreshRemotes();
+        emit remoteActionFinished(QStringLiteral("remove"), remoteName, success,
+                                  success ? QString() : (errorOutput.isEmpty()
+                                      ? QStringLiteral("rclone could not remove this cloud drive.") : errorOutput));
+    });
+    connect(proc, &QProcess::errorOccurred, this, [this, proc, remoteName](QProcess::ProcessError error) {
+        if (error != QProcess::FailedToStart)
+            return;
+        const QString message = proc->errorString();
+        proc->deleteLater();
+        emit remoteActionFinished(QStringLiteral("remove"), remoteName, false, message);
+    });
+    proc->start(QStringLiteral("rclone"), {QStringLiteral("config"), QStringLiteral("delete"), remoteName});
+}
+
+void RcloneService::runConfigurationCommand(const QStringList &args)
+{
+    if (m_configurationBusy)
+        return;
+
+    m_configurationBusy = true;
+    emit configurationBusyChanged();
+    QProcess *proc = new QProcess(this);
+    m_configurationProcess = proc;
+    connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this,
+            [this, proc](int exitCode, QProcess::ExitStatus status) {
+        const QString output = QString::fromUtf8(proc->readAllStandardOutput()).trimmed();
+        const QString stderrText = QString::fromUtf8(proc->readAllStandardError()).trimmed();
+        m_configurationProcess = nullptr;
+        m_configurationBusy = false;
+        emit configurationBusyChanged();
+        proc->deleteLater();
+
+        QJsonParseError parseError;
+        const QJsonDocument document = QJsonDocument::fromJson(output.toUtf8(), &parseError);
+        if (status != QProcess::NormalExit || exitCode != 0 || parseError.error != QJsonParseError::NoError
+            || !document.isObject()) {
+            const QString error = !stderrText.isEmpty() ? stderrText
+                : (!output.isEmpty() ? output : QStringLiteral("rclone exited without a response."));
+            emit configurationFinished(m_configurationRemoteName, false, error);
+            return;
+        }
+
+        const QJsonObject response = document.object();
+        const QString error = response.value(QStringLiteral("Error")).toString();
+        const QString state = response.value(QStringLiteral("State")).toString();
+        if (!error.isEmpty() && state.isEmpty()) {
+            emit configurationFinished(m_configurationRemoteName, false, error);
+            return;
+        }
+        if (!state.isEmpty()) {
+            m_configurationState = state;
+            emit configurationQuestion(m_configurationRemoteName, state,
+                                       response.value(QStringLiteral("Option")).toObject().toVariantMap(), error);
+            return;
+        }
+
+        const QString configuredRemote = m_configurationRemoteName;
+        m_configurationRemoteName.clear();
+        m_configurationBackend.clear();
+        m_configurationState.clear();
+        refreshRemotes();
+        emit configurationFinished(configuredRemote, true, QString());
+    });
+    connect(proc, &QProcess::errorOccurred, this, [this, proc](QProcess::ProcessError error) {
+        if (error != QProcess::FailedToStart)
+            return;
+        const QString message = proc->errorString();
+        m_configurationProcess = nullptr;
+        m_configurationBusy = false;
+        emit configurationBusyChanged();
+        proc->deleteLater();
+        emit configurationFinished(m_configurationRemoteName, false, message);
+    });
+    proc->start(QStringLiteral("rclone"), args);
 }
 
 bool RcloneService::checkRcloneAvailable() const

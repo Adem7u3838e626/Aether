@@ -95,6 +95,8 @@ public:
     // "Extract To...": asks for a folder through the desktop portal's file
     // chooser, then extracts there. Cancelling does nothing.
     Q_INVOKABLE void extractArchiveTo(const QString &archivePath);
+    // Copies a set of files or folders to a destination chosen through the desktop portal.
+    Q_INVOKABLE void copyFilesToFolder(const QStringList &sources, const QString &title);
     Q_INVOKABLE static bool isArchive(const QString &path);
     // A reported (current, total) as a fraction for the UI: always 0..1, or
     // -1 when there is no total to measure against. Clamped here because a
@@ -132,6 +134,7 @@ signals:
 
 private slots:
     void onExtractFolderChosen(uint response, const QVariantMap &results);
+    void onCopyFolderChosen(uint response, const QVariantMap &results);
 
 private:
     void startTerminal(const QString &dirPath, const QStringList &command);
@@ -140,6 +143,8 @@ private:
     // object its answer arrives on.
     QString m_extractToArchive;
     QString m_extractToRequest;
+    QStringList m_copyToSources;
+    QString m_copyToRequest;
     struct ActiveTransfer {
         int id = 0;
         QThread *thread = nullptr;

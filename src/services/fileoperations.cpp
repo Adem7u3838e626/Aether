@@ -2582,6 +2582,77 @@ void FileOperations::stopWaitingForExtractFolder()
     m_extractToArchive.clear();
 }
 
+void FileOperations::copyFilesToFolder(const QStringList &sources, const QString &title)
+{
+    if (sources.isEmpty())
+        return;
+
+    if (!m_copyToRequest.isEmpty()) {
+        QDBusConnection::sessionBus().disconnect(
+            kPortalService, m_copyToRequest, kPortalRequest, QStringLiteral("Response"),
+            this, SLOT(onCopyFolderChosen(uint,QVariantMap)));
+    }
+
+    QDBusConnection bus = QDBusConnection::sessionBus();
+    const QString token = QStringLiteral("hyprfm%1").arg(QRandomGenerator::global()->generate());
+    QString sender = bus.baseService().mid(1);
+    sender.replace(QLatin1Char('.'), QLatin1Char('_'));
+    m_copyToRequest = QStringLiteral("/org/freedesktop/portal/desktop/request/%1/%2").arg(sender, token);
+    m_copyToSources = sources;
+    bus.connect(kPortalService, m_copyToRequest, kPortalRequest, QStringLiteral("Response"),
+                this, SLOT(onCopyFolderChosen(uint,QVariantMap)));
+
+    QDBusMessage call = QDBusMessage::createMethodCall(
+        kPortalService, QStringLiteral("/org/freedesktop/portal/desktop"),
+        QStringLiteral("org.freedesktop.portal.FileChooser"), QStringLiteral("OpenFile"));
+    call << QString() << title
+         << QVariantMap{
+                {QStringLiteral("handle_token"), token},
+                {QStringLiteral("directory"), true},
+                {QStringLiteral("modal"), true},
+                {QStringLiteral("accept_label"), QStringLiteral("Copy Here")},
+                {QStringLiteral("current_folder"), QByteArray(QDir::homePath().toUtf8() + '\0')},
+            };
+    const auto fail = [this]() {
+        if (!m_copyToRequest.isEmpty())
+            QDBusConnection::sessionBus().disconnect(
+                kPortalService, m_copyToRequest, kPortalRequest, QStringLiteral("Response"),
+                this, SLOT(onCopyFolderChosen(uint,QVariantMap)));
+        m_copyToRequest.clear();
+        m_copyToSources.clear();
+        emit operationFinished(false,
+            QStringLiteral("No folder picker available: xdg-desktop-portal is not running"));
+    };
+    const QDBusPendingCall pending = bus.asyncCall(call);
+    if (pending.isFinished()) {
+        if (pending.isError())
+            fail();
+        return;
+    }
+    auto *watcher = new QDBusPendingCallWatcher(pending, this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this, [watcher, fail]() {
+        watcher->deleteLater();
+        if (watcher->isError())
+            fail();
+    });
+}
+
+void FileOperations::onCopyFolderChosen(uint response, const QVariantMap &results)
+{
+    const QStringList sources = m_copyToSources;
+    QDBusConnection::sessionBus().disconnect(
+        kPortalService, m_copyToRequest, kPortalRequest, QStringLiteral("Response"),
+        this, SLOT(onCopyFolderChosen(uint,QVariantMap)));
+    m_copyToRequest.clear();
+    m_copyToSources.clear();
+    const QStringList uris = results.value(QStringLiteral("uris")).toStringList();
+    if (response != 0 || sources.isEmpty() || uris.isEmpty())
+        return;
+    const QString destination = QUrl(uris.constFirst()).toLocalFile();
+    if (!destination.isEmpty())
+        copyFiles(sources, destination);
+}
+
 QString FileOperations::archivePassword(const QString &archivePath) const
 {
     return m_archivePasswords.value(archivePath);

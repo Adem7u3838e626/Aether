@@ -11,6 +11,10 @@ Rectangle {
 
     property string currentPath: ""
     property string trashPath: fsModel.homePath() + "/.local/share/Trash/files"
+    readonly property string currentUserName: {
+        const parts = fsModel.homePath().split("/").filter(part => part !== "")
+        return parts.length > 0 ? parts[parts.length - 1] : "User"
+    }
     property bool isRecentsView: false
     property Item tooltipLayer: null
     signal bookmarkClicked(string path)
@@ -26,6 +30,7 @@ Rectangle {
     signal recentsClicked()
     signal collapseClicked()
     signal featureHintRequested(string message)
+    signal cloudDriveConnectRequested()
 
     color: Theme.mantle
     clip: false
@@ -961,15 +966,200 @@ Rectangle {
             }
         }
 
-        // Spacer pushes operations bar to bottom
+        // Keep active transfer status above the anchored footer sections.
+        OperationsBar {
+            Layout.fillWidth: true
+        }
+
+        // Spacer pushes the cloud and account sections down.
         Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
         }
 
-        // File operations progress bar
-        OperationsBar {
+        // Keep cloud drives in their own bottom section, separate from the
+        // quick access, bookmarks, saved splits, and mounted devices above.
+        Rectangle {
             Layout.fillWidth: true
+            Layout.leftMargin: Theme.spacing
+            Layout.rightMargin: Theme.spacing
+            height: 1
+            color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.08)
+        }
+
+        // Preview UI only: this does not contact a provider or save accounts.
+        ColumnLayout {
+            Layout.fillWidth: true
+            spacing: 2
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.leftMargin: Theme.spacing
+                Layout.rightMargin: Theme.spacing
+                Layout.topMargin: 6
+                Layout.bottomMargin: 2
+
+                Text {
+                    text: "Cloud Drives"
+                    color: Theme.subtext
+                    font.pointSize: Theme.fontSmall
+                    font.bold: true
+                }
+
+                Item { Layout.fillWidth: true }
+
+                HoverRect {
+                    width: 24
+                    height: 24
+                    Accessible.name: "Add cloud drive"
+                    onClicked: root.cloudDriveConnectRequested()
+                    IconPlus { anchors.centerIn: parent; size: 14; color: Theme.subtext }
+                }
+            }
+
+            Repeater {
+                model: rcloneService.remoteNames
+
+                delegate: Rectangle {
+                    required property string modelData
+                    Layout.fillWidth: true
+                    Layout.leftMargin: Theme.spacing / 2
+                    Layout.rightMargin: Theme.spacing / 2
+                    height: 32
+                    radius: Theme.radiusSmall
+                    readonly property var activeMountsSnapshot: rcloneService.activeMounts
+                    readonly property bool mounted: activeMountsSnapshot.indexOf(modelData) >= 0
+                        && rcloneService.isMounted(modelData)
+                    color: remoteHover.containsMouse
+                        ? Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.07)
+                        : "transparent"
+
+                    Row {
+                        anchors.fill: parent
+                        anchors.leftMargin: Theme.spacing
+                        anchors.rightMargin: Theme.spacing
+                        spacing: Theme.spacing
+
+                        IconCloud {
+                            anchors.verticalCenter: parent.verticalCenter
+                            size: 18
+                            color: parent.parent.mounted ? Theme.accent : Theme.subtext
+                        }
+
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: parent.parent.modelData
+                            color: parent.parent.mounted ? Theme.accent : Theme.text
+                            font.pointSize: Theme.fontNormal
+                            elide: Text.ElideRight
+                            width: parent.width - 26 - Theme.spacing
+                        }
+                    }
+
+                    MouseArea {
+                        id: remoteHover
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                        onClicked: (mouse) => {
+                            const path = rcloneService.getMountPath(parent.modelData)
+                            if (mouse.button === Qt.RightButton) {
+                                const mapped = remoteHover.mapToItem(null, mouse.x, mouse.y)
+                                root.sidebarContextMenuRequested({
+                                    kind: "cloudRemote",
+                                    name: parent.modelData,
+                                    remoteName: parent.modelData,
+                                    path: path
+                                }, Qt.point(mapped.x, mapped.y))
+                            } else {
+                                root.bookmarkClicked(path)
+                            }
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.leftMargin: Theme.spacing / 2
+                Layout.rightMargin: Theme.spacing / 2
+                height: 32
+                radius: Theme.radiusSmall
+                color: addCloudDriveHover.containsMouse
+                    ? Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.07)
+                    : "transparent"
+
+                Row {
+                    anchors.fill: parent
+                    anchors.leftMargin: Theme.spacing
+                    anchors.rightMargin: Theme.spacing
+                    spacing: Theme.spacing
+
+                    IconCloud {
+                        anchors.verticalCenter: parent.verticalCenter
+                        size: 18
+                        color: Theme.subtext
+                    }
+
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "Add a cloud drive"
+                        color: Theme.text
+                        font.pointSize: Theme.fontNormal
+                        elide: Text.ElideRight
+                        width: parent.width - 26 - Theme.spacing
+                    }
+                }
+
+                MouseArea {
+                    id: addCloudDriveHover
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.cloudDriveConnectRequested()
+                }
+            }
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.leftMargin: Theme.spacing / 2
+            Layout.rightMargin: Theme.spacing / 2
+            Layout.bottomMargin: Theme.spacing / 2
+            height: 42
+            radius: Theme.radiusSmall
+            color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.045)
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: Theme.spacing
+                anchors.rightMargin: Theme.spacing
+                spacing: Theme.spacing
+
+                Rectangle {
+                    Layout.preferredWidth: 26
+                    Layout.preferredHeight: 26
+                    radius: width / 2
+                    color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.18)
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: root.currentUserName.slice(0, 1).toUpperCase()
+                        color: Theme.accent
+                        font.pointSize: Theme.fontSmall
+                        font.bold: true
+                    }
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    text: root.currentUserName
+                    color: Theme.text
+                    font.pointSize: Theme.fontNormal
+                    elide: Text.ElideRight
+                }
+            }
         }
     }
 }

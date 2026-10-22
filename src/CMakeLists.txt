@@ -108,6 +108,7 @@ list(APPEND hyprfm_qml_module_args
         qml/components/ArchivePasswordDialog.qml
         qml/components/ConfirmDialog.qml
         qml/components/RemoteConnectDialog.qml
+        qml/components/CloudDriveDialog.qml
         qml/components/PreviewLoader.qml
         qml/components/QuickPreview.qml
         qml/components/CsvTable.qml
@@ -145,6 +146,7 @@ list(APPEND hyprfm_qml_module_args
         qml/icons/IconVideo.qml
         qml/icons/IconMonitor.qml
         qml/icons/IconGlobe.qml
+        qml/icons/IconCloud.qml
         qml/icons/IconRocket.qml
         qml/icons/IconSettings.qml
         qml/icons/IconFilter.qml
