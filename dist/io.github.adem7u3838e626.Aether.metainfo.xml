@@ -31,9 +31,9 @@
 
   <launchable type="desktop-id">io.github.adem7u3838e626.Aether.desktop</launchable>
 
-  <url type="homepage">https://github.com/Adem7u3838e626/hyprfm</url>
-  <url type="bugtracker">https://github.com/Adem7u3838e626/hyprfm/issues</url>
-  <url type="vcs-browser">https://github.com/Adem7u3838e626/hyprfm</url>
+  <url type="homepage">https://github.com/Adem7u3838e626/Aether</url>
+  <url type="bugtracker">https://github.com/Adem7u3838e626/Aether/issues</url>
+  <url type="vcs-browser">https://github.com/Adem7u3838e626/Aether</url>
 
   <developer id="io.github.adem7u3838e626">
     <name>Soyeb Pervez Jim</name>
@@ -42,15 +42,15 @@
   <screenshots>
     <screenshot type="default">
       <caption>Grid view with file preview</caption>
-      <image>https://raw.githubusercontent.com/Adem7u3838e626/hyprfm/v0.6.1/docs/screenshots/grid-view.png</image>
+      <image>https://raw.githubusercontent.com/Adem7u3838e626/Aether/v0.6.1/docs/screenshots/grid-view.png</image>
     </screenshot>
     <screenshot>
       <caption>Miller column view</caption>
-      <image>https://raw.githubusercontent.com/Adem7u3838e626/hyprfm/v0.6.1/docs/screenshots/miller-view.png</image>
+      <image>https://raw.githubusercontent.com/Adem7u3838e626/Aether/v0.6.1/docs/screenshots/miller-view.png</image>
     </screenshot>
     <screenshot>
       <caption>Quick preview overlay</caption>
-      <image>https://raw.githubusercontent.com/Adem7u3838e626/hyprfm/v0.6.1/docs/screenshots/quick-preview.png</image>
+      <image>https://raw.githubusercontent.com/Adem7u3838e626/Aether/v0.6.1/docs/screenshots/quick-preview.png</image>
     </screenshot>
   </screenshots>
 

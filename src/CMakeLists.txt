@@ -82,6 +82,7 @@ option(AETHER_ENABLE_QML_CACHEGEN "Enable Qt QML cache compilation (faster start
 set(aether_qml_module_args
     URI Aether
     VERSION 1.0
+    RESOURCE_PREFIX /
 )
 
 if(NOT AETHER_ENABLE_QML_CACHEGEN)
@@ -201,6 +202,11 @@ set(quill_qml_module_args
     VERSION 1.0
     RESOURCE_PREFIX /qt/qml
     OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Quill
+    # Quill ships a standalone Quickshell showcase beside its reusable
+    # components. It is not part of this module or Aether's runtime, so do
+    # not let Qt's static-plugin scanner treat that developer tool as a
+    # dependency of the file manager.
+    NO_IMPORT_SCAN
 )
 if(NOT AETHER_ENABLE_QML_CACHEGEN)
     list(APPEND quill_qml_module_args NO_CACHEGEN)

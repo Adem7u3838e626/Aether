@@ -89,7 +89,7 @@ import re, sys, pathlib
 path, tag = pathlib.Path(sys.argv[1]), sys.argv[2]
 text = path.read_text()
 new, n = re.subn(
-    r'(url:\s*https://github\.com/Adem7u3838e626/hyprfm\.git\s*\n(?:[^\n]*\n)*?\s*tag:\s*)v\d+\.\d+\.\d+',
+    r'(url:\s*https://github\.com/Adem7u3838e626/Aether\.git\s*\n(?:[^\n]*\n)*?\s*tag:\s*)v\d+\.\d+\.\d+',
     rf'\g<1>{tag}',
     text,
 )
@@ -109,7 +109,7 @@ text = path.read_text()
 
 # Screenshot URLs
 text = re.sub(
-    r'(raw\.githubusercontent\.com/Adem7u3838e626/hyprfm/)v\d+\.\d+\.\d+',
+    r'(raw\.githubusercontent\.com/Adem7u3838e626/Aether/)v\d+\.\d+\.\d+',
     rf'\g<1>{tag}',
     text,
 )

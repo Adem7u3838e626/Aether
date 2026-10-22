@@ -222,7 +222,7 @@ modules:
     sources:
       # ── FLATHUB SUBMISSION ──
       - type: git
-        url: https://github.com/Adem7u3838e626/hyprfm.git
+        url: https://github.com/Adem7u3838e626/Aether.git
         tag: v0.6.1
 
       # ── LOCAL ITERATION ──

@@ -4,7 +4,7 @@ pkgver=r198.g53be041
 pkgrel=1
 pkgdesc="A lightweight Qt6/QML file manager for Hyprland"
 arch=('x86_64' 'aarch64')
-url="https://github.com/Adem7u3838e626/hyprfm"
+url="https://github.com/Adem7u3838e626/Aether"
 license=('MIT')
 depends=(
     'glib2'
@@ -40,7 +40,7 @@ optdepends=(
 provides=('aether')
 conflicts=('aether')
 source=(
-    "${pkgname}::git+https://github.com/Adem7u3838e626/hyprfm.git"
+    "${pkgname}::git+https://github.com/Adem7u3838e626/Aether.git"
     "quill-icons::git+https://github.com/soyeb-jim285/quill-icons.git"
     "quill::git+https://github.com/soyeb-jim285/quill.git"
 )

@@ -250,6 +250,16 @@ cmake --build build --parallel
 ./build/src/aether
 ```
 
+To install a user-local `aether` command and add **Aether** to your desktop
+app launcher, run:
+
+```bash
+cmake --install build --prefix "$HOME/.local"
+```
+
+The installed launcher entry is named Aether; the terminal command is
+`aether`. Make sure `$HOME/.local/bin` is on your `PATH` to run it by name.
+
 > **Note:** the `--recursive` flag is important: Aether uses Git submodules for the [Quill](https://github.com/soyeb-jim285/quill) component library and the [quill-icons](https://github.com/soyeb-jim285/quill-icons) icon set.
 
 #### AppImage from source

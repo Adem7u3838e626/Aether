@@ -179,7 +179,7 @@
 
           meta = with pkgs.lib; {
             description = "A lightweight Qt6/QML file manager for Hyprland";
-            homepage = "https://github.com/Adem7u3838e626/hyprfm";
+            homepage = "https://github.com/Adem7u3838e626/Aether";
             license = licenses.mit;
             mainProgram = "aether";
             platforms = systems;

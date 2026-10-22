@@ -12,6 +12,16 @@ set(CMAKE_AUTORCC ON)
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 DBus Svg Network Concurrent)
 find_package(KF6WindowSystem QUIET)
 
+# Keep Aether's compiled QML resources under :/Aether, where main.cpp and the
+# installed qmldir expect them, while explicitly opting into Qt's QML policy.
+qt_policy(SET QTP0001 NEW)
+
+# QTP0004 was added in Qt 6.8. Enable generated qmldir files for QML
+# subdirectories when the installed Qt supports the policy.
+if(Qt6_VERSION VERSION_GREATER_EQUAL "6.8")
+    qt_policy(SET QTP0004 NEW)
+endif()
+
 add_subdirectory(src)
 
 # Install themes

@@ -64,7 +64,7 @@ jobs:
           flatpak_tag=$(python3 -c '
           import re
           t = open("io.github.adem7u3838e626.Aether.yml").read()
-          m = re.search(r"url:\s*https://github\.com/Adem7u3838e626/hyprfm\.git\s*\n(?:[^\n]*\n)*?\s*tag:\s*(v\d+\.\d+\.\d+)", t)
+          m = re.search(r"url:\s*https://github\.com/Adem7u3838e626/Aether\.git\s*\n(?:[^\n]*\n)*?\s*tag:\s*(v\d+\.\d+\.\d+)", t)
           print(m.group(1) if m else "")
           ')
           check "flatpak manifest aether tag" "$TAG" "$flatpak_tag"
@@ -393,7 +393,7 @@ jobs:
           set -euo pipefail
           manifest=io.github.adem7u3838e626.Aether.yml
           # Only the tag right under Aether's own url: other modules pin tags too.
-          sed -i "\|url: https://github.com/Adem7u3838e626/hyprfm.git|{n;s|tag: .*|commit: $SHA|}" "$manifest"
+          sed -i "\|url: https://github.com/Adem7u3838e626/Aether.git|{n;s|tag: .*|commit: $SHA|}" "$manifest"
           grep -q "commit: $SHA" "$manifest"
           flatpak-builder --force-clean --user \
             --repo=flatpak-repo \

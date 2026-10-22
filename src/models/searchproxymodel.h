@@ -52,6 +52,8 @@ protected:
     bool filterAcceptsRow(int sourceRow, const QModelIndex &sourceParent) const override;
 
 private:
+    void beginFilterUpdate();
+    void endFilterUpdate();
     bool matchesText(const QString &fileName) const;
     bool matchesType(const QModelIndex &sourceIndex) const;
     bool matchesSingleType(const QString &type, bool isDirectory,

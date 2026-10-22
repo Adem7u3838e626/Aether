@@ -15,9 +15,26 @@ SearchProxyModel::SearchProxyModel(QObject *parent)
 
 QString SearchProxyModel::searchQuery() const { return m_searchQuery; }
 
+void SearchProxyModel::beginFilterUpdate()
+{
+#if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
+    beginFilterChange();
+#endif
+}
+
+void SearchProxyModel::endFilterUpdate()
+{
+#if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
+    endFilterChange(QSortFilterProxyModel::Direction::Rows);
+#else
+    invalidateFilter();
+#endif
+}
+
 void SearchProxyModel::setSearchQuery(const QString &query)
 {
     if (m_searchQuery == query) return;
+    beginFilterUpdate();
     m_searchQuery = query;
 
     m_isGlob = query.contains('*') || query.contains('?') || query.contains('[')
@@ -28,7 +45,7 @@ void SearchProxyModel::setSearchQuery(const QString &query)
         m_regex = QRegularExpression(pattern, QRegularExpression::CaseInsensitiveOption);
     }
 
-    invalidateFilter();
+    endFilterUpdate();
     emit searchQueryChanged();
     emit searchActiveChanged();
 }
@@ -38,8 +55,9 @@ QString SearchProxyModel::fileTypeFilter() const { return m_fileTypeFilter; }
 void SearchProxyModel::setFileTypeFilter(const QString &filter)
 {
     if (m_fileTypeFilter == filter) return;
+    beginFilterUpdate();
     m_fileTypeFilter = filter;
-    invalidateFilter();
+    endFilterUpdate();
     emit fileTypeFilterChanged();
     emit searchActiveChanged();
 }
@@ -49,8 +67,9 @@ QString SearchProxyModel::dateFilter() const { return m_dateFilter; }
 void SearchProxyModel::setDateFilter(const QString &filter)
 {
     if (m_dateFilter == filter) return;
+    beginFilterUpdate();
     m_dateFilter = filter;
-    invalidateFilter();
+    endFilterUpdate();
     emit dateFilterChanged();
     emit searchActiveChanged();
 }
@@ -60,8 +79,9 @@ QString SearchProxyModel::sizeFilter() const { return m_sizeFilter; }
 void SearchProxyModel::setSizeFilter(const QString &filter)
 {
     if (m_sizeFilter == filter) return;
+    beginFilterUpdate();
     m_sizeFilter = filter;
-    invalidateFilter();
+    endFilterUpdate();
     emit sizeFilterChanged();
     emit searchActiveChanged();
 }
@@ -81,13 +101,14 @@ void SearchProxyModel::switchSourceModel(QAbstractItemModel *model)
 
 void SearchProxyModel::clearSearch()
 {
+    beginFilterUpdate();
     m_searchQuery.clear();
     m_fileTypeFilter.clear();
     m_dateFilter.clear();
     m_sizeFilter.clear();
     m_isGlob = false;
     m_regex = QRegularExpression();
-    invalidateFilter();
+    endFilterUpdate();
     emit searchQueryChanged();
     emit fileTypeFilterChanged();
     emit dateFilterChanged();
