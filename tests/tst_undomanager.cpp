@@ -48,7 +48,7 @@ private slots:
         if (mountPath.isEmpty())
             QSKIP("No writable mounted volume found under /run/media/$USER");
 
-        const QString testDirPath = mountPath + "/hyprfm-undo-test-" + QUuid::createUuid().toString(QUuid::WithoutBraces);
+        const QString testDirPath = mountPath + "/Aether-undo-test-" + QUuid::createUuid().toString(QUuid::WithoutBraces);
         if (!QDir().mkpath(testDirPath))
             QSKIP("Could not create test directory on mounted volume");
 

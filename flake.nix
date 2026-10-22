@@ -1,5 +1,5 @@
 {
-  description = "HyprFM - a lightweight Qt6/QML file manager for Hyprland";
+  description = "Aether - a lightweight Qt6/QML file manager for Hyprland";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -8,7 +8,7 @@
     # update` (src/qml/icons, src/qml/Quill). Plain flake sources don't fetch
     # submodules, so they're pinned here instead and copied into place in
     # postPatch. Pinned to an exact commit rather than a branch: the commits
-    # hyprfm's .gitmodules reference aren't always reachable from quill(-icons)'s
+    # aether's .gitmodules reference aren't always reachable from quill(-icons)'s
     # default branch, so tracking the branch can silently resolve to an older
     # commit. Keep these revs in sync with `git ls-tree main src/qml/Quill
     # src/qml/icons` whenever the submodules are bumped.
@@ -42,10 +42,10 @@
       pkgsFor = system: import nixpkgs { inherit system; };
 
       # Single source of truth for the version lives in CMakeLists.txt
-      # (`project(hyprfm VERSION x.y.z ...)`) so it never has to be bumped
+      # (`project(aether VERSION x.y.z ...)`) so it never has to be bumped
       # in two places.
       version = builtins.head (
-        builtins.match ".*project\\(hyprfm VERSION ([0-9]+\\.[0-9]+\\.[0-9]+).*" (
+        builtins.match ".*project\\(aether VERSION ([0-9]+\\.[0-9]+\\.[0-9]+).*" (
           builtins.readFile ./CMakeLists.txt
         )
       );
@@ -78,10 +78,10 @@
               $out/lib/libgvfscommon.so $out/lib/gio/modules/libgvfsdbus.so
           '';
 
-      mkHyprfm =
+      mkAether =
         pkgs:
         pkgs.stdenv.mkDerivation {
-          pname = "hyprfm";
+          pname = "aether";
           inherit version;
 
           src = self;
@@ -112,7 +112,7 @@
 
           cmakeFlags = [
             "-DBUILD_TESTS=OFF"
-            "-DHYPRFM_DATA_DIR=${placeholder "out"}/share/hyprfm"
+            "-DAETHER_DATA_DIR=${placeholder "out"}/share/Aether"
           ];
 
           qtWrapperArgs = [
@@ -166,7 +166,7 @@
 
             # gvfs ships the client-side GIO module (libgvfsdbus.so). Without
             # it GIO cannot speak the gvfs protocol at all, so sftp:// smb://
-            # and mtp:// transfers fail even when gvfsd is running — hyprfm
+            # and mtp:// transfers fail even when gvfsd is running — aether
             # copies to those URIs in-process via g_file_copy(). NixOS with
             # services.gvfs.enable already exports this, but a plain `nix run`
             # on a non-NixOS host cannot borrow the host module: it is built
@@ -179,23 +179,23 @@
 
           meta = with pkgs.lib; {
             description = "A lightweight Qt6/QML file manager for Hyprland";
-            homepage = "https://github.com/soyeb-jim285/hyprfm";
+            homepage = "https://github.com/Adem7u3838e626/hyprfm";
             license = licenses.mit;
-            mainProgram = "hyprfm";
+            mainProgram = "aether";
             platforms = systems;
           };
         };
     in
     {
       packages = forEachSystem (system: {
-        default = self.packages.${system}.hyprfm;
-        hyprfm = mkHyprfm (pkgsFor system);
+        default = self.packages.${system}.aether;
+        aether = mkAether (pkgsFor system);
       });
 
       apps = forEachSystem (system: {
         default = {
           type = "app";
-          program = "${self.packages.${system}.hyprfm}/bin/hyprfm";
+          program = "${self.packages.${system}.aether}/bin/aether";
           meta.description = "A lightweight Qt6/QML file manager for Hyprland";
         };
       });
@@ -207,7 +207,7 @@
         in
         {
           default = pkgs.mkShell {
-            inputsFrom = [ self.packages.${system}.hyprfm ];
+            inputsFrom = [ self.packages.${system}.aether ];
           };
         }
       );

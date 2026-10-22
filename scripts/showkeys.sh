@@ -1,5 +1,5 @@
 #!/bin/sh
-# Key overlay for screen recordings, colored from the active HyprFM theme.
+# Key overlay for screen recordings, colored from the active Aether theme.
 #
 #   ./scripts/showkeys.sh            # focused monitor
 #   ./scripts/showkeys.sh eDP-1      # named monitor
@@ -30,7 +30,7 @@ wshowkeys -h 2>&1 | grep -q '\-M\]' || {
 round=''
 wshowkeys -h 2>&1 | grep -q '\-r ' && round=1
 
-conf="${XDG_CONFIG_HOME:-$HOME/.config}/hyprfm/config.toml"
+conf="${XDG_CONFIG_HOME:-$HOME/.config}/Aether/config.toml"
 setting() { sed -n "s/^$2[[:space:]]*=[[:space:]]*'\{0,1\}\"\{0,1\}\([^'\"]*\)['\"]\{0,1\}.*/\1/p" "$1" 2>/dev/null | head -1; }
 
 theme="$(setting "$conf" theme)"
@@ -41,12 +41,12 @@ radius="${radius:-12}"
 # Prefer the checkout's themes over the installed copy, so editing a theme and
 # rerunning shows the new colors.
 here="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-for d in "$here/themes" /usr/share/hyprfm/themes; do
+for d in "$here/themes" /usr/share/Aether/themes; do
 	[ -f "$d/$theme.toml" ] && { tfile="$d/$theme.toml"; break; }
 done
 [ -n "${tfile:-}" ] || { echo "theme not found: $theme.toml" >&2; exit 1; }
 
-# Light or dark comes free: it is whichever theme HyprFM itself is running.
+# Light or dark comes free: it is whichever theme Aether itself is running.
 bg="$(setting "$tfile" base)e6"      # e6 = ~90% opaque over the wallpaper
 fg="$(setting "$tfile" text)"
 accent="$(setting "$tfile" accent)"  # modifiers, so Ctrl/Alt read distinct
@@ -65,7 +65,7 @@ hyprctl dispatch focusmonitor "$mon" >/dev/null 2>&1 \
 echo "overlay on $mon — theme $theme, radius $radius"
 
 # 48 is sized for a 2560-wide capture downscaled to 1080p — at 24 the caps were
-# smaller than HyprFM's own status bar text. 4s so a shortcut is still on screen
+# smaller than Aether's own status bar text. 4s so a shortcut is still on screen
 # while the viewer looks at what it did.
 font="${WSK_FONT:-Maple Mono NF 48}"
 

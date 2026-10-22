@@ -439,7 +439,7 @@ private slots:
             QSKIP("gio not found in PATH");
 
         const QString uniqueId = QUuid::createUuid().toString(QUuid::WithoutBraces);
-        const QString dirPath = QDir::homePath() + "/.cache/hyprfm-test-preview-evict-" + uniqueId;
+        const QString dirPath = QDir::homePath() + "/.cache/Aether-test-preview-evict-" + uniqueId;
         QDir().mkpath(dirPath);
         QStringList uris;
         for (const char *name : {"one.txt", "two.txt"}) {
@@ -473,7 +473,7 @@ private slots:
             QSKIP("gio not found in PATH");
 
         const QString uniqueId = QUuid::createUuid().toString(QUuid::WithoutBraces);
-        const QString dirPath = QDir::homePath() + "/.cache/hyprfm-test-preview-service-" + uniqueId;
+        const QString dirPath = QDir::homePath() + "/.cache/Aether-test-preview-service-" + uniqueId;
         QDir().mkpath(dirPath);
 
         const QString filePath = dirPath + "/preview.txt";

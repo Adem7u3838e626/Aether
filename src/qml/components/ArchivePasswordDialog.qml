@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
-import HyprFM
+import Aether
 import Quill as Q
 
 Q.Dialog {

@@ -72,7 +72,7 @@ void hoistSingleRootFolder(const QString &destination)
         return;
 
     const QString inner = entries.constFirst().absoluteFilePath();
-    const QString staging = destination + QStringLiteral(".hyprfm-hoist");
+    const QString staging = destination + QStringLiteral(".aether-hoist");
     if (QFileInfo::exists(staging) || !QFile::rename(inner, staging))
         return;
     if (!QDir().rmdir(destination)) {
@@ -1047,7 +1047,7 @@ QString temporaryRenamePathFor(const QString &sourcePath)
     QString tempPath;
     do {
         tempPath = joinLocation(parentLocation(sourcePath),
-                                QStringLiteral(".hyprfm-rename-%1.tmp")
+                                QStringLiteral(".aether-rename-%1.tmp")
                                     .arg(QUuid::createUuid().toString(QUuid::WithoutBraces)));
     } while (pathExistsSync(tempPath));
 
@@ -1860,7 +1860,7 @@ void FileOperations::openFileWith(const QString &path, const QString &desktopFil
         program = qEnvironmentVariable("TERMINAL", QStringLiteral("kitty"));
         args = QStringList{QStringLiteral("-e")} + command;
     } else {
-        // `gio launch` comes from glib2, which HyprFM already requires; the
+        // `gio launch` comes from glib2, which Aether already requires; the
         // gtk-launch this used to call lives in gtk3 and is often absent.
         QString hostEntryPath = entryPath;
         if (hostEntryPath.startsWith(QLatin1String("/run/host/")))
@@ -2004,7 +2004,7 @@ QString FileOperations::pasteClipboardImage(const QString &destinationDir)
     return outputPath;
 }
 
-// wl-copy on Wayland keeps the path on the clipboard after HyprFM exits;
+// wl-copy on Wayland keeps the path on the clipboard after Aether exits;
 // elsewhere (X11), or without wl-clipboard, Qt's clipboard does the job.
 void FileOperations::copyPathToClipboard(const QString &path)
 {
@@ -2142,7 +2142,7 @@ void FileOperations::runCustomAction(const QString &command, const QStringList &
     }
 }
 
-// Launch a second, independent HyprFM window. `--new-window` makes the child
+// Launch a second, independent Aether window. `--new-window` makes the child
 // skip the single-instance handoff (and the shared session file), so the two
 // windows coexist instead of the new process forwarding to this one.
 void FileOperations::openNewWindow(const QString &dirPath)
@@ -2517,7 +2517,7 @@ void FileOperations::extractArchiveTo(const QString &archivePath)
     stopWaitingForExtractFolder();   // a newer ask replaces an unanswered one
 
     QDBusConnection bus = QDBusConnection::sessionBus();
-    const QString token = QStringLiteral("hyprfm%1").arg(QRandomGenerator::global()->generate());
+    const QString token = QStringLiteral("aether%1").arg(QRandomGenerator::global()->generate());
     QString sender = bus.baseService().mid(1);   // ":1.42" -> "1_42"
     sender.replace(QLatin1Char('.'), QLatin1Char('_'));
     m_extractToRequest = QStringLiteral("/org/freedesktop/portal/desktop/request/%1/%2")
@@ -2594,7 +2594,7 @@ void FileOperations::copyFilesToFolder(const QStringList &sources, const QString
     }
 
     QDBusConnection bus = QDBusConnection::sessionBus();
-    const QString token = QStringLiteral("hyprfm%1").arg(QRandomGenerator::global()->generate());
+    const QString token = QStringLiteral("aether%1").arg(QRandomGenerator::global()->generate());
     QString sender = bus.baseService().mid(1);
     sender.replace(QLatin1Char('.'), QLatin1Char('_'));
     m_copyToRequest = QStringLiteral("/org/freedesktop/portal/desktop/request/%1/%2").arg(sender, token);
@@ -3005,7 +3005,7 @@ QString FileOperations::conflictBackupPath(const QString &targetPath) const
 {
     QString cacheRoot = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
     if (cacheRoot.isEmpty())
-        cacheRoot = QDir::homePath() + "/.cache/hyprfm";
+        cacheRoot = QDir::homePath() + "/.cache/Aether";
 
     QDir backupDir(cacheRoot + "/conflict-backups");
     backupDir.mkpath(".");

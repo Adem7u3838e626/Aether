@@ -616,24 +616,24 @@ void ConfigManager::saveMillerFractions(double parent, double current)
 
 QString ConfigManager::documentedConfigTemplate()
 {
-    return QStringLiteral(R"(# HyprFM configuration — ~/.config/hyprfm/config.toml
+    return QStringLiteral(R"(# Aether configuration — ~/.config/Aether/config.toml
 #
 # Every key below is at its default; delete or comment out anything you do
-# not want to override. Changes are picked up live while HyprFM runs.
+# not want to override. Changes are picked up live while Aether runs.
 #
-# NOTE: when you change a setting inside HyprFM (Settings panel, column
+# NOTE: when you change a setting inside Aether (Settings panel, column
 # drags, bookmarks…) the app rewrites this file and these comments are lost.
 # config.toml.sample next to it is regenerated on every start and always
 # has the full documented set of keys for the version you are running.
 
 [general]
-# Colour theme: a file name from /usr/share/hyprfm/themes or
-# ~/.config/hyprfm/themes without ".toml". Unset = follow the system
+# Colour theme: a file name from /usr/share/Aether/themes or
+# ~/.config/Aether/themes without ".toml". Unset = follow the system
 # light/dark preference (catppuccin-latte / catppuccin-mocha).
 # theme = "catppuccin-mocha"
 
 # The pair the Dark Mode switch in Settings flips between. Point them at any
-# two themes; a script can also just rewrite "theme" above and HyprFM reloads.
+# two themes; a script can also just rewrite "theme" above and Aether reloads.
 light_theme = "catppuccin-latte"
 dark_theme = "catppuccin-mocha"
 
@@ -676,7 +676,7 @@ sort_ascending = true
 # Remember a different sort per folder (stored in folder_sort.json).
 remember_sort_per_folder = true
 
-# Warn at startup when a tool HyprFM uses (gvfs, ffmpeg, bat, pdftoppm…) is missing.
+# Warn at startup when a tool Aether uses (gvfs, ffmpeg, bat, pdftoppm…) is missing.
 dependency_startup_check = true
 
 [sidebar]
@@ -715,7 +715,7 @@ anim_curve_exit = "InCubic"
 anim_curve_transition = "Bezier"
 
 [window]
-# Draw minimize/maximize/close buttons in HyprFM's own title bar.
+# Draw minimize/maximize/close buttons in Aether's own title bar.
 # Unset = on only when the compositor provides no decorations.
 # show_controls = false
 # Button order, ":" separates left from right side.

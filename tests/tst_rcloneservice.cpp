@@ -80,17 +80,17 @@ private slots:
         RcloneService service;
         QSignalSpy finished(&service, &RcloneService::mountFinished);
 
-        service.mountRemote(QStringLiteral("hyprfm-test-nosuchremote"));
+        service.mountRemote(QStringLiteral("Aether-test-nosuchremote"));
 
         QTRY_VERIFY_WITH_TIMEOUT(finished.count() == 1, 20000);
-        QCOMPARE(finished.at(0).at(0).toString(), QString("hyprfm-test-nosuchremote"));
+        QCOMPARE(finished.at(0).at(0).toString(), QString("Aether-test-nosuchremote"));
         QCOMPARE(finished.at(0).at(1).toBool(), false);
         QVERIFY(!finished.at(0).at(2).toString().isEmpty());
-        QVERIFY(!service.isMounted(QStringLiteral("hyprfm-test-nosuchremote")));
+        QVERIFY(!service.isMounted(QStringLiteral("Aether-test-nosuchremote")));
 
         // mountRemote() creates the mount point before it knows the mount
         // will fail; don't leave it behind in the user's home.
-        QDir().rmdir(service.getMountPath(QStringLiteral("hyprfm-test-nosuchremote")));
+        QDir().rmdir(service.getMountPath(QStringLiteral("Aether-test-nosuchremote")));
     }
 };
 

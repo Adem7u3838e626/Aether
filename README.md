@@ -1,25 +1,25 @@
 <div align="center">
 
-<img src="dist/io.github.soyeb_jim285.HyprFM.svg" width="96" alt="HyprFM logo"/>
+<img src="dist/io.github.adem7u3838e626.Aether.svg" width="96" alt="Aether logo"/>
 
-# HyprFM
+# Aether
 
 **A fast, keyboard-friendly file manager for Hyprland and Wayland desktops.**
 
-[![License](https://img.shields.io/github/license/soyeb-jim285/hyprfm?style=flat-square)](LICENSE)
-[![Release](https://img.shields.io/github/v/release/soyeb-jim285/hyprfm?style=flat-square)](https://github.com/soyeb-jim285/hyprfm/releases)
-[![AUR](https://img.shields.io/aur/version/hyprfm-git?style=flat-square&logo=arch-linux)](https://aur.archlinux.org/packages/hyprfm-git)
-[![Build](https://img.shields.io/github/actions/workflow/status/soyeb-jim285/hyprfm/build.yml?style=flat-square)](https://github.com/soyeb-jim285/hyprfm/actions)
+[![License](https://img.shields.io/github/license/Adem7u3838e626/hyprfm?style=flat-square)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/Adem7u3838e626/hyprfm?style=flat-square)](https://github.com/Adem7u3838e626/hyprfm/releases)
+[![AUR](https://img.shields.io/aur/version/aether-git?style=flat-square&logo=arch-linux)](https://aur.archlinux.org/packages/aether-git)
+[![Build](https://img.shields.io/github/actions/workflow/status/Adem7u3838e626/hyprfm/build.yml?style=flat-square)](https://github.com/Adem7u3838e626/hyprfm/actions)
 
 </div>
 
 ---
 
-HyprFM is a Qt6/QML file manager designed to feel native on Hyprland: lightweight, themeable, and built around fast keyboard navigation. It pairs a polished UI with the practical features power users expect, including Miller column view, kinetic scrolling, drag & drop, async operations, rich previews, and a TOML-based theme system.
+Aether is a Qt6/QML file manager designed to feel native on Hyprland: lightweight, themeable, and built around fast keyboard navigation. It pairs a polished UI with the practical features power users expect, including Miller column view, kinetic scrolling, drag & drop, async operations, rich previews, and a TOML-based theme system.
 
 <div align="center">
 
-![HyprFM demo](docs/screenshots/demo.gif)
+![Aether demo](docs/screenshots/demo.gif)
 *Miller columns with a live preview pane, then bulk rename with its preview list*
 
 </div>
@@ -136,63 +136,51 @@ HyprFM is a Qt6/QML file manager designed to feel native on Hyprland: lightweigh
 ### Arch Linux (AUR)
 
 ```bash
-yay -S hyprfm-git
+yay -S aether-git
 ```
 
-The PKGBUILD pulls latest `main`, builds with Ninja + parallel jobs + tests disabled, and installs to `/usr/bin/hyprfm`.
+The PKGBUILD pulls latest `main`, builds with Ninja + parallel jobs + tests disabled, and installs to `/usr/bin/aether`.
 
-### Flatpak (self-hosted)
+### Flatpak
 
-HyprFM publishes a signed Flatpak repository at `hyprfm.soyebjim.me`. Because HyprFM depends on the KDE Platform runtime from Flathub, the Flathub remote must exist at the **same scope** you install into. For `--user` installs, that means a `--user` Flathub remote. Add both remotes once and install:
+The fork has a Flatpak manifest for local builds, but does not have a published
+Flatpak repository yet. Install the KDE runtime and build it from this checkout:
+
+For local iteration, install the KDE runtime and SDK from Flathub, then edit
+the manifest’s `sources` list: comment out its Git source and uncomment the
+local `type: dir` source. Run:
 
 ```bash
-# Flathub at user scope (provides org.kde.Platform)
-flatpak remote-add --user --if-not-exists \
-    flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-
-# HyprFM repo
-flatpak remote-add --user --if-not-exists \
-    hyprfm https://flatpak.hyprfm.soyebjim.me/hyprfm.flatpakrepo
-flatpak install --user hyprfm io.github.soyeb_jim285.HyprFM
+flatpak remote-add --user --if-not-exists flathub \
+    https://dl.flathub.org/repo/flathub.flatpakrepo
+flatpak install --user flathub org.kde.Platform//6.9 org.kde.Sdk//6.9
+flatpak-builder --force-clean --user --install build-flatpak \
+    io.github.adem7u3838e626.Aether.yml
+flatpak run io.github.adem7u3838e626.Aether
 ```
-
-If you'd rather install system-wide, drop every `--user` flag and prefix with `sudo`; system Flathub is already configured on most distros.
-
-Updates arrive via the usual `flatpak update`. The repo is signed with a GPG key committed at [`public-key.asc`](https://github.com/soyeb-jim285/hyprfm-flatpak-repo/blob/main/public-key.asc); Flatpak verifies every download against it automatically.
-
-Each tagged release also attaches an `HyprFM-vX.Y.Z-x86_64.flatpak` bundle to the GitHub release for users who want a single-file install without adding a remote.
 
 ### AppImage (any distro)
 
-```bash
-curl -LO "$(curl -fsSL https://api.github.com/repos/soyeb-jim285/hyprfm/releases/latest \
-    | grep -o 'https://[^"]*\.AppImage')"
-chmod +x HyprFM-*.AppImage
-./HyprFM-*.AppImage
-```
-
-The asset name carries the version, so grab the current one from the
-[releases page](https://github.com/soyeb-jim285/hyprfm/releases/latest) if you would rather not pipe through `curl`.
-
-The AppImage is fully self-contained. You do not need a system Qt installation.
+Build a local AppImage from this checkout with `./scripts/build-appimage-local.sh`.
+The script creates a self-contained `Aether-<version>-x86_64.AppImage`.
 
 ### Nix (flake)
 
 ```bash
-nix run github:soyeb-jim285/hyprfm
+nix run github:Adem7u3838e626/hyprfm
 ```
 
 Or pull it into a system/home-manager flake:
 
 ```nix
 {
-  inputs.hyprfm.url = "github:soyeb-jim285/hyprfm";
+  inputs.aether.url = "github:Adem7u3838e626/hyprfm";
 }
 ```
 
-then reference `hyprfm.packages.<system>.default` in `environment.systemPackages` / `home.packages`. The package version is parsed straight from `CMakeLists.txt`, so it always tracks the tree it's built from.
+then reference `aether.packages.<system>.default` in `environment.systemPackages` / `home.packages`. The package version is parsed straight from `CMakeLists.txt`, so it always tracks the tree it's built from.
 
-The package bundles the tools HyprFM shells out to, including archive handling,
+The package bundles the tools Aether shells out to, including archive handling,
 previews, search and the gvfs client module, so nothing else has to be
 installed alongside it.
 
@@ -204,23 +192,23 @@ application's closure. On NixOS:
 services.gvfs.enable = true;
 ```
 
-Without it the Trash still works, because HyprFM reads the trash directories
+Without it the Trash still works, because Aether reads the trash directories
 directly, but the Network sidebar (`sftp://`, `smb://`, `mtp://`) has nothing to
 connect to. On a non-NixOS host the distro's own gvfs covers this.
 
 ### Build from source
 
 ```bash
-git clone --recursive https://github.com/soyeb-jim285/hyprfm.git
-cd hyprfm
+git clone --recursive https://github.com/Adem7u3838e626/hyprfm.git aether
+cd aether
 cmake -B build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DBUILD_TESTS=OFF
 cmake --build build --parallel
-./build/src/hyprfm
+./build/src/aether
 ```
 
-> **Note:** the `--recursive` flag is important: HyprFM uses Git submodules for the [Quill](https://github.com/soyeb-jim285/quill) component library and the [quill-icons](https://github.com/soyeb-jim285/quill-icons) icon set.
+> **Note:** the `--recursive` flag is important: Aether uses Git submodules for the [Quill](https://github.com/soyeb-jim285/quill) component library and the [quill-icons](https://github.com/soyeb-jim285/quill-icons) icon set.
 
 #### AppImage from source
 
@@ -230,7 +218,7 @@ To build a self-contained AppImage from the current checkout, useful for testing
 ./scripts/build-appimage-local.sh
 ```
 
-The result lands in the repo root as `HyprFM-<version>-x86_64.AppImage`. The script downloads `linuxdeploy` into `appimage-tools/` on first run, bundles Qt, and runs an offscreen smoke test before finishing. It needs `curl` or `wget` on top of the build dependencies below.
+The result lands in the repo root as `Aether-<version>-x86_64.AppImage`. The script downloads `linuxdeploy` into `appimage-tools/` on first run, bundles Qt, and runs an offscreen smoke test before finishing. It needs `curl` or `wget` on top of the build dependencies below.
 
 #### Dependencies
 
@@ -301,8 +289,8 @@ install is needed there.
 | `Alt+9` | Jump to the last tab |
 | `Ctrl+Alt+N` | New window |
 
-Launching `hyprfm` while it is already running opens another independent
-window. The one exception is `hyprfm <path>`, which forwards the path to the
+Launching `aether` while it is already running opens another independent
+window. The one exception is `aether <path>`, which forwards the path to the
 running window as a new tab, so desktop launchers and `xdg-open` keep behaving
 as expected. Pass `--new-window` (or `-n`) to get a separate window for a path
 too.
@@ -310,7 +298,7 @@ too.
 Only the first window keeps the saved session (tabs + window geometry);
 additional windows start fresh and leave it untouched.
 
-Run `hyprfm --help` for the full list of flags and environment variables.
+Run `aether --help` for the full list of flags and environment variables.
 
 ### File operations
 
@@ -328,13 +316,13 @@ Run `hyprfm --help` for the full list of flags and environment variables.
 | `Ctrl+Alt+T` | Open terminal here |
 | `Shift+F10` | Context menu |
 
-Shortcuts can be remapped in `~/.config/hyprfm/config.toml` under the `[shortcuts]` section (see the generated `config.toml.sample` for the full key list). Fixed: `Backspace`, `Alt+1`…`Alt+9`, `Ctrl+PgUp`/`Ctrl+PgDown`, `Ctrl+Scroll`, `Escape`, `Menu`.
+Shortcuts can be remapped in `~/.config/Aether/config.toml` under the `[shortcuts]` section (see the generated `config.toml.sample` for the full key list). Fixed: `Backspace`, `Alt+1`…`Alt+9`, `Ctrl+PgUp`/`Ctrl+PgDown`, `Ctrl+Scroll`, `Escape`, `Menu`.
 
 ---
 
 ## ⚙ Configuration
 
-Config lives at `~/.config/hyprfm/config.toml`. On first run HyprFM writes it fully commented; changing settings inside the app rewrites the file without comments, so `~/.config/hyprfm/config.toml.sample` (regenerated on every start) is the always-documented reference.
+Config lives at `~/.config/Aether/config.toml`. On first run Aether writes it fully commented; changing settings inside the app rewrites the file without comments, so `~/.config/Aether/config.toml.sample` (regenerated on every start) is the always-documented reference.
 
 ```toml
 [general]
@@ -412,15 +400,15 @@ shortcut = "Ctrl+E"                 # optional; runs the action on the selection
 ## 🎨 Theming
 
 Themes are plain TOML files. Nothing is hardcoded in the binary. Five themes
-ship in `/usr/share/hyprfm/themes/*.toml` — `catppuccin-mocha`,
+ship in `/usr/share/Aether/themes/*.toml` — `catppuccin-mocha`,
 `catppuccin-latte`, `rose-pine`, `rose-pine-moon` and `rose-pine-dawn`. Copy one
 as a starting point:
 
 ```sh
-cp /usr/share/hyprfm/themes/catppuccin-mocha.toml ~/.config/hyprfm/themes/mytheme.toml
+cp /usr/share/Aether/themes/catppuccin-mocha.toml ~/.config/Aether/themes/mytheme.toml
 ```
 
-`~/.config/hyprfm/themes/` is created on first run and searched first, so a file
+`~/.config/Aether/themes/` is created on first run and searched first, so a file
 there shadows a bundled theme of the same name. Every `*.toml` in either
 directory appears in the theme picker. Select it there, or set it in config:
 
@@ -447,7 +435,7 @@ warning = "#f9e2af"
 error   = "#f38ba8"
 ```
 
-`~/.config/hyprfm/themes/example.toml.sample` is rewritten on every start with
+`~/.config/Aether/themes/example.toml.sample` is rewritten on every start with
 the same table plus a comment per colour, so the directory documents itself.
 
 Themes reload live on save.
@@ -466,24 +454,24 @@ dark_theme = "rose-pine"
 Both are dropdowns under Settings, so you can set them there instead. `theme`
 is whichever one is currently in effect.
 
-HyprFM does not watch your desktop for light/dark changes. If you want it to
+Aether does not watch your desktop for light/dark changes. If you want it to
 follow a system-wide toggle, have that toggle rewrite `theme` in
 `config.toml`: the file is watched and the new theme applies immediately, with
-no restart and no need for HyprFM to be running at the time.
+no restart and no need for Aether to be running at the time.
 
 ```sh
-sed -i 's/^theme = .*/theme = "rose-pine-dawn"/' ~/.config/hyprfm/config.toml
+sed -i 's/^theme = .*/theme = "rose-pine-dawn"/' ~/.config/Aether/config.toml
 ```
 
 The only time the desktop is consulted is the very first launch, when there is
-no `theme` yet: HyprFM asks the XDG desktop portal whether you prefer light or
+no `theme` yet: Aether asks the XDG desktop portal whether you prefer light or
 dark so the initial theme matches rather than always starting dark.
 
 ---
 
 ## 🧱 Architecture
 
-HyprFM is a three-layer Qt6 application:
+Aether is a three-layer Qt6 application:
 
 - **QML frontend** (`src/qml/`): all rendering. `Main.qml` wires tab state, selection, and shortcuts. Views (`FileGridView`, `FileDetailedView`, `FileMillerView`) are switched by `FileViewContainer`. The [Quill](https://github.com/soyeb-jim285/quill) component library provides themed Buttons, TextFields, Cards, etc.
 - **C++ backend** (`src/models/`, `src/services/`, `src/providers/`): `QAbstractListModel` subclasses for files, tabs, bookmarks, devices. Async services for clipboard, file operations, search, disk usage, previews. Exposed to QML via `setContextProperty`.

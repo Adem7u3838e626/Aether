@@ -181,7 +181,7 @@ QString pageCacheDir()
     // Not cached in a static: it is only consulted on a cache miss or a write,
     // and resolving it each time keeps it honest when XDG_CACHE_HOME changes.
     return QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation)
-        + QStringLiteral("/hyprfm/pdf-pages");
+        + QStringLiteral("/Aether/pdf-pages");
 }
 
 QString diskCachePath(const QString &key)

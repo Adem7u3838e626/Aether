@@ -1,4 +1,4 @@
-set(HYPRFM_SOURCES
+set(AETHER_SOURCES
     main.cpp
     services/configmanager.cpp
     services/themeloader.cpp
@@ -30,13 +30,13 @@ set(HYPRFM_SOURCES
     providers/pdfpreviewprovider.cpp
 )
 
-qt_add_executable(hyprfm ${HYPRFM_SOURCES})
+qt_add_executable(aether ${AETHER_SOURCES})
 
-option(HYPRFM_ENABLE_PCH "Enable precompiled headers (faster builds)" ON)
-option(HYPRFM_ENABLE_UNITY_BUILD "Enable unity builds (faster clean builds)" ON)
+option(AETHER_ENABLE_PCH "Enable precompiled headers (faster builds)" ON)
+option(AETHER_ENABLE_UNITY_BUILD "Enable unity builds (faster clean builds)" ON)
 
-if(HYPRFM_ENABLE_PCH)
-    target_precompile_headers(hyprfm PRIVATE
+if(AETHER_ENABLE_PCH)
+    target_precompile_headers(aether PRIVATE
         <QtCore/QObject>
         <QtCore/QString>
         <QtCore/QStringList>
@@ -49,8 +49,8 @@ if(HYPRFM_ENABLE_PCH)
     )
 endif()
 
-if(HYPRFM_ENABLE_UNITY_BUILD)
-    set_target_properties(hyprfm PROPERTIES
+if(AETHER_ENABLE_UNITY_BUILD)
+    set_target_properties(aether PROPERTIES
         UNITY_BUILD ON
         UNITY_BUILD_BATCH_SIZE 8
     )
@@ -72,23 +72,23 @@ set_source_files_properties(qml/theme/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE
 # by the source file's path and mtime, so it is empty on the first launch after
 # every install or update, and a Flatpak whose runtime remounts /app pays ~400 ms
 # to recompile 86 QML files. Release-type builds therefore default to ON.
-set(hyprfm_cachegen_default OFF)
+set(aether_cachegen_default OFF)
 if(CMAKE_BUILD_TYPE MATCHES "^(Release|RelWithDebInfo|MinSizeRel)$")
-    set(hyprfm_cachegen_default ON)
+    set(aether_cachegen_default ON)
 endif()
-option(HYPRFM_ENABLE_QML_CACHEGEN "Enable Qt QML cache compilation (faster startup, slower builds)"
-       ${hyprfm_cachegen_default})
+option(AETHER_ENABLE_QML_CACHEGEN "Enable Qt QML cache compilation (faster startup, slower builds)"
+       ${aether_cachegen_default})
 
-set(hyprfm_qml_module_args
-    URI HyprFM
+set(aether_qml_module_args
+    URI Aether
     VERSION 1.0
 )
 
-if(NOT HYPRFM_ENABLE_QML_CACHEGEN)
-    list(APPEND hyprfm_qml_module_args NO_CACHEGEN)
+if(NOT AETHER_ENABLE_QML_CACHEGEN)
+    list(APPEND aether_qml_module_args NO_CACHEGEN)
 endif()
 
-list(APPEND hyprfm_qml_module_args
+list(APPEND aether_qml_module_args
     QML_FILES
         qml/Main.qml
         qml/theme/Theme.qml
@@ -183,10 +183,10 @@ list(APPEND hyprfm_qml_module_args
         qml/components/SettingsPanel.qml
 )
 
-qt_add_qml_module(hyprfm ${hyprfm_qml_module_args})
+qt_add_qml_module(aether ${aether_qml_module_args})
 
 # Quill (the src/qml/Quill submodule) is compiled in as its own QML module,
-# like HyprFM, rather than found on disk through import paths. From disk it
+# like Aether, rather than found on disk through import paths. From disk it
 # was parsed at runtime, cached by path (so an AppImage, mounted somewhere new
 # each launch, recompiled it every time), and resolved through import paths
 # that included the build tree, which an installed binary preferred over its
@@ -202,7 +202,7 @@ set(quill_qml_module_args
     RESOURCE_PREFIX /qt/qml
     OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Quill
 )
-if(NOT HYPRFM_ENABLE_QML_CACHEGEN)
+if(NOT AETHER_ENABLE_QML_CACHEGEN)
     list(APPEND quill_qml_module_args NO_CACHEGEN)
 endif()
 qt_add_qml_module(quill ${quill_qml_module_args}
@@ -233,9 +233,9 @@ qt_add_qml_module(quill ${quill_qml_module_args}
         qml/Quill/components/Label.qml
 )
 target_link_libraries(quill PRIVATE Qt6::Quick)
-target_link_libraries(hyprfm PRIVATE quillplugin)
+target_link_libraries(aether PRIVATE quillplugin)
 
-target_link_libraries(hyprfm PRIVATE
+target_link_libraries(aether PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Qml
@@ -249,30 +249,30 @@ target_link_libraries(hyprfm PRIVATE
 )
 
 if(KF6WindowSystem_FOUND)
-    target_link_libraries(hyprfm PRIVATE KF6::WindowSystem)
+    target_link_libraries(aether PRIVATE KF6::WindowSystem)
 endif()
 
-target_include_directories(hyprfm PRIVATE
+target_include_directories(aether PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party
 )
 
-set(HYPRFM_DATA_DIR "${CMAKE_SOURCE_DIR}" CACHE STRING "Runtime data directory for themes and QML")
+set(AETHER_DATA_DIR "${CMAKE_SOURCE_DIR}" CACHE STRING "Runtime data directory for themes and QML")
 
-target_compile_definitions(hyprfm PRIVATE
-    HYPRFM_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
-    HYPRFM_DATA_DIR="${HYPRFM_DATA_DIR}"
-    HYPRFM_VERSION="${PROJECT_VERSION}"
+target_compile_definitions(aether PRIVATE
+    AETHER_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+    AETHER_DATA_DIR="${AETHER_DATA_DIR}"
+    AETHER_VERSION="${PROJECT_VERSION}"
 )
 
 if(KF6WindowSystem_FOUND)
-    target_compile_definitions(hyprfm PRIVATE HYPRFM_HAS_KWINDOWSYSTEM=1)
+    target_compile_definitions(aether PRIVATE AETHER_HAS_KWINDOWSYSTEM=1)
 endif()
 
-install(TARGETS hyprfm DESTINATION bin)
-install(FILES "${CMAKE_SOURCE_DIR}/dist/io.github.soyeb_jim285.HyprFM.desktop"
+install(TARGETS aether DESTINATION bin)
+install(FILES "${CMAKE_SOURCE_DIR}/dist/io.github.adem7u3838e626.Aether.desktop"
     DESTINATION share/applications)
-install(FILES "${CMAKE_SOURCE_DIR}/dist/io.github.soyeb_jim285.HyprFM.svg"
+install(FILES "${CMAKE_SOURCE_DIR}/dist/io.github.adem7u3838e626.Aether.svg"
     DESTINATION share/icons/hicolor/scalable/apps)
-install(FILES "${CMAKE_SOURCE_DIR}/dist/io.github.soyeb_jim285.HyprFM.metainfo.xml"
+install(FILES "${CMAKE_SOURCE_DIR}/dist/io.github.adem7u3838e626.Aether.metainfo.xml"
     DESTINATION share/metainfo)

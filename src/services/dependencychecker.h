@@ -6,7 +6,7 @@
 #include <QVariantList>
 #include <QVariantMap>
 
-// Aggregates every runtime tool and compile-time feature HyprFM can use, with
+// Aggregates every runtime tool and compile-time feature Aether can use, with
 // human-readable purpose strings and per-distro install commands. Drives the
 // MissingDependenciesDialog. Separate from RuntimeFeaturesService (which owns
 // simple Q_PROPERTY feature flags consumed throughout QML) — this service is
@@ -33,7 +33,7 @@ public:
         QString displayName;     // e.g. "NTFS mount helper"
         QString purpose;         // One-line user-facing description
         Kind kind;
-        bool required;           // true → HyprFM won't work well without it
+        bool required;           // true → Aether won't work well without it
         bool available;          // Resolved at construction / refresh()
         QStringList commands;    // Executable candidates tried on PATH (for tools)
         QVariantMap installHints;// distroId → install command (plus "generic")

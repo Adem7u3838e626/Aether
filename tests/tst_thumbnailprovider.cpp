@@ -232,7 +232,7 @@ private slots:
             QSKIP("gio not found in PATH");
 
         const QString uniqueId = QUuid::createUuid().toString(QUuid::WithoutBraces);
-        const QString dirPath = QDir::homePath() + "/.cache/hyprfm-test-trash-thumb-" + uniqueId;
+        const QString dirPath = QDir::homePath() + "/.cache/Aether-test-trash-thumb-" + uniqueId;
         QDir().mkpath(dirPath);
 
         QImage img(200, 120, QImage::Format_ARGB32);

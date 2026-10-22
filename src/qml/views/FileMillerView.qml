@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Controls
-import HyprFM
+import Aether
 import Quill as Q
 
 FocusScope {

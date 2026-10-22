@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Shapes
-import HyprFM
+import Aether
 
 // Custom context menu — Hyprland compositor handles blur via windowrule
 Item {

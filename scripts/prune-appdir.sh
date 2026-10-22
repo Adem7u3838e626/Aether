@@ -1,5 +1,5 @@
 #!/bin/bash
-# Drop Qt payload linuxdeploy-plugin-qt bundles but HyprFM never loads.
+# Drop Qt payload linuxdeploy-plugin-qt bundles but Aether never loads.
 # Run after the first linuxdeploy pass, before `--output appimage`.
 # Every removal here is covered by the AppImage smoke test.
 set -euo pipefail
@@ -16,7 +16,7 @@ rm -rf "$appdir/usr/qml/QtQuick/Controls/designer"
 rm -rf "$appdir/usr/qml/QtQuick/Dialogs"
 rm -f "$appdir"/usr/lib/libQt6QuickDialogs2*.so*
 
-# Qt's own .qm files: HyprFM has no translations and never installs a QTranslator.
+# Qt's own .qm files: Aether has no translations and never installs a QTranslator.
 rm -rf "$appdir/usr/translations"
 
 # Picked up from src/qml/Quill/Showcase.qml on machines that have Quickshell installed.

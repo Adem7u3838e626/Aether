@@ -48,7 +48,7 @@ jobs:
           AUR_SSH_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
 
       - name: Clone AUR repo
-        run: git clone ssh://aur@aur.archlinux.org/hyprfm-git.git aur-repo
+        run: git clone ssh://aur@aur.archlinux.org/aether-git.git aur-repo
 
       - name: Sync package metadata
         run: |

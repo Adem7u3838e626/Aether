@@ -1,10 +1,10 @@
 # Maintainer: Your Name <your@email.com>
-pkgname=hyprfm-git
+pkgname=aether-git
 pkgver=r198.g53be041
 pkgrel=1
 pkgdesc="A lightweight Qt6/QML file manager for Hyprland"
 arch=('x86_64' 'aarch64')
-url="https://github.com/soyeb-jim285/hyprfm"
+url="https://github.com/Adem7u3838e626/hyprfm"
 license=('MIT')
 depends=(
     'glib2'
@@ -37,10 +37,10 @@ optdepends=(
     'perl-image-exiftool: EXIF metadata for images (via exiftool)'
     'udisks2: mount/unmount devices from sidebar'
 )
-provides=('hyprfm')
-conflicts=('hyprfm')
+provides=('aether')
+conflicts=('aether')
 source=(
-    "${pkgname}::git+https://github.com/soyeb-jim285/hyprfm.git"
+    "${pkgname}::git+https://github.com/Adem7u3838e626/hyprfm.git"
     "quill-icons::git+https://github.com/soyeb-jim285/quill-icons.git"
     "quill::git+https://github.com/soyeb-jim285/quill.git"
 )
@@ -64,32 +64,32 @@ build() {
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/usr \
         -DBUILD_TESTS=OFF \
-        -DHYPRFM_DATA_DIR=/usr/share/hyprfm
+        -DAETHER_DATA_DIR=/usr/share/Aether
     cmake --build build --parallel
 }
 
 package() {
     # Install the compiled binary
-    install -Dm755 "build/src/hyprfm" "${pkgdir}/usr/bin/hyprfm"
+    install -Dm755 "build/src/aether" "${pkgdir}/usr/bin/aether"
 
-    # Install themes — loaded via applicationDirPath()/../themes → /usr/share/hyprfm/themes
-    install -dm755 "${pkgdir}/usr/share/hyprfm/themes"
+    # Install themes — loaded via applicationDirPath()/../themes → /usr/share/Aether/themes
+    install -dm755 "${pkgdir}/usr/share/Aether/themes"
     install -Dm644 "${pkgname}/themes/"*.toml \
-        -t "${pkgdir}/usr/share/hyprfm/themes/"
+        -t "${pkgdir}/usr/share/Aether/themes/"
 
-    # Install QML module metadata (needed for loadFromModule to find HyprFM)
-    install -Dm644 "build/src/HyprFM/qmldir" \
-        "${pkgdir}/usr/share/hyprfm/HyprFM/qmldir"
-    install -Dm644 "build/src/HyprFM/hyprfm.qmltypes" \
-        "${pkgdir}/usr/share/hyprfm/HyprFM/hyprfm.qmltypes" 2>/dev/null || true
+    # Install QML module metadata (needed for loadFromModule to find Aether)
+    install -Dm644 "build/src/Aether/qmldir" \
+        "${pkgdir}/usr/share/Aether/Aether/qmldir"
+    install -Dm644 "build/src/Aether/aether.qmltypes" \
+        "${pkgdir}/usr/share/Aether/Aether/aether.qmltypes" 2>/dev/null || true
 
     # Install desktop entry, icon and AppStream metainfo
-    install -Dm644 "${pkgname}/dist/io.github.soyeb_jim285.HyprFM.desktop" \
-        "${pkgdir}/usr/share/applications/io.github.soyeb_jim285.HyprFM.desktop"
-    install -Dm644 "${pkgname}/dist/io.github.soyeb_jim285.HyprFM.svg" \
-        "${pkgdir}/usr/share/icons/hicolor/scalable/apps/io.github.soyeb_jim285.HyprFM.svg"
-    install -Dm644 "${pkgname}/dist/io.github.soyeb_jim285.HyprFM.metainfo.xml" \
-        "${pkgdir}/usr/share/metainfo/io.github.soyeb_jim285.HyprFM.metainfo.xml"
+    install -Dm644 "${pkgname}/dist/io.github.adem7u3838e626.Aether.desktop" \
+        "${pkgdir}/usr/share/applications/io.github.adem7u3838e626.Aether.desktop"
+    install -Dm644 "${pkgname}/dist/io.github.adem7u3838e626.Aether.svg" \
+        "${pkgdir}/usr/share/icons/hicolor/scalable/apps/io.github.adem7u3838e626.Aether.svg"
+    install -Dm644 "${pkgname}/dist/io.github.adem7u3838e626.Aether.metainfo.xml" \
+        "${pkgdir}/usr/share/metainfo/io.github.adem7u3838e626.Aether.metainfo.xml"
 
     # Install license
     install -Dm644 "${pkgname}/LICENSE" \

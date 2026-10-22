@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
-import HyprFM
+import Aether
 import Quill as Q
 
 Q.Dialog {
@@ -9,7 +9,7 @@ Q.Dialog {
     z: 1002
     dialogWidth: Math.min(720, width - 40)
     title: "Missing dependencies"
-    subtitle: "HyprFM works best when the following tools and features are available."
+    subtitle: "Aether works best when the following tools and features are available."
 
     // Three model arrays, fed from `dependencies.missingDependencies` on open().
     property var missingRequired: []
@@ -110,7 +110,7 @@ Q.Dialog {
                         Text {
                             Layout.fillWidth: true
                             text: "These are needed for core file operations. "
-                                + "HyprFM may not work correctly until they are installed."
+                                + "Aether may not work correctly until they are installed."
                             color: Theme.subtext
                             font.pointSize: Theme.fontSmall
                             wrapMode: Text.WordWrap
@@ -140,7 +140,7 @@ Q.Dialog {
                         }
                         Text {
                             Layout.fillWidth: true
-                            text: "These enable extra features. HyprFM works without them but certain actions will be unavailable."
+                            text: "These enable extra features. Aether works without them but certain actions will be unavailable."
                             color: Theme.subtext
                             font.pointSize: Theme.fontSmall
                             wrapMode: Text.WordWrap
@@ -170,7 +170,7 @@ Q.Dialog {
                         }
                         Text {
                             Layout.fillWidth: true
-                            text: "These are compiled into HyprFM at build time. To enable them, install the full (non-minimal) package or rebuild from source with the listed libraries available."
+                            text: "These are compiled into Aether at build time. To enable them, install the full (non-minimal) package or rebuild from source with the listed libraries available."
                             color: Theme.subtext
                             font.pointSize: Theme.fontSmall
                             wrapMode: Text.WordWrap

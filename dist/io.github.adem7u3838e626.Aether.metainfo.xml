@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>io.github.soyeb_jim285.HyprFM</id>
+  <id>io.github.adem7u3838e626.Aether</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
 
-  <name>HyprFM</name>
+  <name>Aether</name>
   <summary>Lightweight Qt6/QML file manager for Hyprland</summary>
 
   <description>
     <p>
-      HyprFM is a fast, keyboard-driven file manager built with Qt6 and QML.
+      Aether is a fast, keyboard-driven file manager built with Qt6 and QML.
       It is designed for tiling Wayland compositors like Hyprland but works on
       any Wayland desktop session.
     </p>
@@ -29,28 +29,28 @@
     </ul>
   </description>
 
-  <launchable type="desktop-id">io.github.soyeb_jim285.HyprFM.desktop</launchable>
+  <launchable type="desktop-id">io.github.adem7u3838e626.Aether.desktop</launchable>
 
-  <url type="homepage">https://github.com/soyeb-jim285/hyprfm</url>
-  <url type="bugtracker">https://github.com/soyeb-jim285/hyprfm/issues</url>
-  <url type="vcs-browser">https://github.com/soyeb-jim285/hyprfm</url>
+  <url type="homepage">https://github.com/Adem7u3838e626/hyprfm</url>
+  <url type="bugtracker">https://github.com/Adem7u3838e626/hyprfm/issues</url>
+  <url type="vcs-browser">https://github.com/Adem7u3838e626/hyprfm</url>
 
-  <developer id="io.github.soyeb_jim285">
+  <developer id="io.github.adem7u3838e626">
     <name>Soyeb Pervez Jim</name>
   </developer>
 
   <screenshots>
     <screenshot type="default">
       <caption>Grid view with file preview</caption>
-      <image>https://raw.githubusercontent.com/soyeb-jim285/hyprfm/v0.6.1/docs/screenshots/grid-view.png</image>
+      <image>https://raw.githubusercontent.com/Adem7u3838e626/hyprfm/v0.6.1/docs/screenshots/grid-view.png</image>
     </screenshot>
     <screenshot>
       <caption>Miller column view</caption>
-      <image>https://raw.githubusercontent.com/soyeb-jim285/hyprfm/v0.6.1/docs/screenshots/miller-view.png</image>
+      <image>https://raw.githubusercontent.com/Adem7u3838e626/hyprfm/v0.6.1/docs/screenshots/miller-view.png</image>
     </screenshot>
     <screenshot>
       <caption>Quick preview overlay</caption>
-      <image>https://raw.githubusercontent.com/soyeb-jim285/hyprfm/v0.6.1/docs/screenshots/quick-preview.png</image>
+      <image>https://raw.githubusercontent.com/Adem7u3838e626/hyprfm/v0.6.1/docs/screenshots/quick-preview.png</image>
     </screenshot>
   </screenshots>
 
@@ -62,7 +62,7 @@
   </categories>
 
   <provides>
-    <binary>hyprfm</binary>
+    <binary>aether</binary>
   </provides>
 
   <releases>
@@ -189,7 +189,7 @@
     </release>
     <release version="0.4.6" date="2026-04-08">
       <description>
-        <p>Documentation polish: correct the feature list in the AppStream metadata to match the three views HyprFM actually ships (grid, detailed and Miller columns) and expand it to mention git status overlays, remote access, quick preview and archive support.</p>
+        <p>Documentation polish: correct the feature list in the AppStream metadata to match the three views Aether actually ships (grid, detailed and Miller columns) and expand it to mention git status overlays, remote access, quick preview and archive support.</p>
       </description>
     </release>
     <release version="0.4.5" date="2026-04-08">

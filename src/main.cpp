@@ -29,7 +29,7 @@
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <unistd.h>
-#ifdef HYPRFM_HAS_KWINDOWSYSTEM
+#ifdef AETHER_HAS_KWINDOWSYSTEM
 #include <KWindowEffects>
 #endif
 
@@ -87,14 +87,14 @@ namespace {
 // without it never appears -- so it has to be probed, and the probe costs
 // ~50 ms (it loads every installed Vulkan driver, which Qt then does again).
 // So it never runs on the startup path: the answer is cached in
-// ~/.cache/hyprfm/renderer, keyed on the installed Vulkan driver manifests,
+// ~/.cache/Aether/renderer, keyed on the installed Vulkan driver manifests,
 // and a launch without a valid answer uses OpenGL and probes on a worker
 // thread after its first frame. Each Vulkan launch leaves a per-pid marker
 // until it paints; a marker whose process is gone means Vulkan launched and
 // never drew, and every later launch stays on OpenGL until the drivers change.
 
 // The loader is reached through dlopen with hand-declared structs rather than
-// <vulkan/vulkan.h>, so building HyprFM needs neither the Vulkan headers nor
+// <vulkan/vulkan.h>, so building Aether needs neither the Vulkan headers nor
 // libvulkan; the Vulkan ABI is frozen. A CPU-only device (lavapipe) does not
 // count: OpenGL on the real GPU beats Vulkan on the CPU.
 bool hasHardwareVulkanDevice()
@@ -119,7 +119,7 @@ bool hasHardwareVulkanDevice()
     bool found = false;
     auto getProc = reinterpret_cast<GetProc>(dlsym(lib, "vkGetInstanceProcAddr"));
     auto create = getProc ? reinterpret_cast<Create>(getProc(nullptr, "vkCreateInstance")) : nullptr;
-    const AppInfo app{0 /* APPLICATION_INFO */, nullptr, "hyprfm", 0, nullptr, 0,
+    const AppInfo app{0 /* APPLICATION_INFO */, nullptr, "aether", 0, nullptr, 0,
                       (1u << 22) | (1u << 12) /* 1.1 */};
     const CreateInfo info{1 /* INSTANCE_CREATE_INFO */, nullptr, 0, &app, 0, nullptr, 0, nullptr};
     Instance instance = nullptr;
@@ -175,7 +175,7 @@ void warmVulkanDriver()
     using Enumerate = int (*)(Instance, uint32_t *, Device *);
     auto getProc = reinterpret_cast<GetProc>(dlsym(lib, "vkGetInstanceProcAddr"));
     auto create = getProc ? reinterpret_cast<Create>(getProc(nullptr, "vkCreateInstance")) : nullptr;
-    const AppInfo app{0, nullptr, "hyprfm", 0, nullptr, 0, (1u << 22) | (1u << 12)};
+    const AppInfo app{0, nullptr, "aether", 0, nullptr, 0, (1u << 22) | (1u << 12)};
     const CreateInfo info{1, nullptr, 0, &app, 0, nullptr, 0, nullptr};
     Instance instance = nullptr;
     if (create && create(&info, nullptr, &instance) == 0) {
@@ -227,7 +227,7 @@ QByteArray vulkanDriverFingerprint()
 // installed beside RADV and no NVIDIA card active, instance creation took
 // 46 ms against 19 ms for RADV alone. When exactly one manifest drives real
 // hardware, launches name it in VK_DRIVER_FILES. Each manifest is tried in a
-// child process (hyprfm --vulkan-probe with only that driver visible), so
+// child process (aether --vulkan-probe with only that driver visible), so
 // this process never changes its environment while threads are running.
 QString soleHardwareVulkanDriver()
 {
@@ -259,7 +259,7 @@ QString soleHardwareVulkanDriver()
 // Without one there is no hardware to render with: Qt's OpenGL path would
 // fall to llvmpipe, Mesa's software rasteriser, which measured 332 ms to the
 // window, 320 MB PSS and 2.0 s of CPU at startup, against 194 ms, 73 MB and
-// 0.3 s for Qt Quick's own software renderer. HyprFM uses no shader effects,
+// 0.3 s for Qt Quick's own software renderer. Aether uses no shader effects,
 // so it renders the same.
 bool hasGpuRenderNode()
 {
@@ -273,7 +273,7 @@ class RendererChoice
 public:
     RendererChoice()
         : m_dir(QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation)
-                + QStringLiteral("/hyprfm"))
+                + QStringLiteral("/Aether"))
     {
         if (!qEnvironmentVariableIsEmpty("QSG_RHI_BACKEND")
             || !qEnvironmentVariableIsEmpty("QT_QUICK_BACKEND"))
@@ -404,16 +404,16 @@ struct AppWindow : public QObject
 
 // Printed by --help. Qt's QCommandLineParser would need a constructed
 // QCoreApplication, and both --help and --version have to answer before the
-// Wayland check below — `hyprfm --help` over SSH should still work.
+// Wayland check below — `aether --help` over SSH should still work.
 void printUsage()
 {
     printf(
-        "HyprFM %s — a Qt6/QML file manager for Wayland\n"
+        "Aether %s — a Qt6/QML file manager for Wayland\n"
         "\n"
         "Usage:\n"
-        "  hyprfm [options] [path]\n"
+        "  aether [options] [path]\n"
         "\n"
-        "With no path, launching HyprFM while it is already running opens\n"
+        "With no path, launching Aether while it is already running opens\n"
         "another window. With a path, the running window gains a tab instead,\n"
         "unless --new-window is given.\n"
         "\n"
@@ -423,11 +423,11 @@ void printUsage()
         "  -v, --version      Show the version and exit.\n"
         "\n"
         "Environment:\n"
-        "  HYPRFM_TIMING=1    Print startup timings to stderr.\n"
-        "  HYPRFM_MSAA=2|4    Enable full-window multisampling (costly).\n"
+        "  AETHER_TIMING=1    Print startup timings to stderr.\n"
+        "  AETHER_MSAA=2|4    Enable full-window multisampling (costly).\n"
         "\n"
         "Qt options such as -style are accepted and passed through.\n",
-        HYPRFM_VERSION);
+        AETHER_VERSION);
 }
 
 // What the desktop itself is set to, read the way every Wayland toolkit reads
@@ -542,12 +542,12 @@ private:
     bool m_applying = false;
 };
 
-const char kExampleTheme[] = R"(# HyprFM theme sample.
+const char kExampleTheme[] = R"(# Aether theme sample.
 #
 # Copy this file to "mytheme.toml" in this directory, edit the colours, then put
 #     [general]
 #     theme = "mytheme"
-# in ~/.config/hyprfm/config.toml, or pick it in Settings. Every *.toml here is
+# in ~/.config/Aether/config.toml, or pick it in Settings. Every *.toml here is
 # listed there, and a file here shadows the bundled theme of the same name.
 #
 # Any key you leave out keeps its built-in default.
@@ -610,7 +610,7 @@ int main(int argc, char *argv[])
             return 0;
         }
         if (a == "-v" || a == "--version") {
-            printf("hyprfm %s\n", HYPRFM_VERSION);
+            printf("aether %s\n", AETHER_VERSION);
             return 0;
         }
         // Internal: run by soleHardwareVulkanDriver() with one driver visible.
@@ -628,12 +628,12 @@ int main(int argc, char *argv[])
         "qt.svg.warning=false");
 
     // Keep the default path fast. Full-window MSAA is expensive on many
-    // Wayland/compositor stacks; opt in with HYPRFM_MSAA=2/4 if wanted.
+    // Wayland/compositor stacks; opt in with AETHER_MSAA=2/4 if wanted.
     QSurfaceFormat fmt;
-    fmt.setSamples(qMax(0, qEnvironmentVariableIntValue("HYPRFM_MSAA")));
+    fmt.setSamples(qMax(0, qEnvironmentVariableIntValue("AETHER_MSAA")));
     QSurfaceFormat::setDefaultFormat(fmt);
 
-    // HyprFM runs on Wayland and, through Qt's X11 backend, on X11. With no
+    // Aether runs on Wayland and, through Qt's X11 backend, on X11. With no
     // display at all Qt would abort with a cryptic "could not connect to
     // display" (or "Failed to create wl_display"), so say what is missing.
     // An explicit QT_QPA_PLATFORM (offscreen in tests and the AppImage smoke
@@ -642,11 +642,11 @@ int main(int argc, char *argv[])
         && qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM")) {
         fprintf(stderr,
                 "\n"
-                "HyprFM: no display found: neither $WAYLAND_DISPLAY nor $DISPLAY is set.\n"
+                "Aether: no display found: neither $WAYLAND_DISPLAY nor $DISPLAY is set.\n"
                 "\n"
-                "Start HyprFM from a graphical session (Wayland or X11).\n"
+                "Start Aether from a graphical session (Wayland or X11).\n"
                 "If running via Flatpak, grant display access:\n"
-                "  flatpak override --user --socket=wayland --socket=fallback-x11 io.github.soyeb_jim285.HyprFM\n"
+                "  flatpak override --user --socket=wayland --socket=fallback-x11 io.github.adem7u3838e626.Aether\n"
                 "\n");
         return 1;
     }
@@ -682,13 +682,13 @@ int main(int argc, char *argv[])
     RendererChoice renderer;
 
     QGuiApplication app(argc, argv);
-    app.setApplicationName("HyprFM Expanded");
-    app.setOrganizationName("hyprfm-expanded");
-    app.setDesktopFileName("hyprfm-expanded");
+    app.setApplicationName("Aether");
+    app.setOrganizationName("aether");
+    app.setDesktopFileName("aether");
 
-    // Startup timing: opt-in via HYPRFM_TIMING=1 so normal runs stay quiet.
+    // Startup timing: opt-in via AETHER_TIMING=1 so normal runs stay quiet.
     // Prints milliseconds from QGuiApplication construction at each phase.
-    const bool timingEnabled = qEnvironmentVariableIntValue("HYPRFM_TIMING") != 0;
+    const bool timingEnabled = qEnvironmentVariableIntValue("AETHER_TIMING") != 0;
     QElapsedTimer startupTimer;
     startupTimer.start();
     auto mark = [&](const char *label) {
@@ -713,8 +713,8 @@ int main(int argc, char *argv[])
         QFontMetricsF(QFont()).horizontalAdvance(QStringLiteral("0123456789 GB free of"));
     }).detach();
 
-    // One process serves every window. Launching HyprFM while it runs hands
-    // the request to it over a per-uid unix socket: `hyprfm <path>` adds a tab
+    // One process serves every window. Launching Aether while it runs hands
+    // the request to it over a per-uid unix socket: `aether <path>` adds a tab
     // to the window last used (what desktop launchers and `xdg-open` rely on),
     // and a bare launch or `--new-window` opens another window.
     //
@@ -724,16 +724,16 @@ int main(int argc, char *argv[])
     //
     // The socket lives in the runtime directory ($XDG_RUNTIME_DIR, or Qt's own
     // 0700 fallback), which only this user can write to. It used to be
-    // /tmp/hyprfm-<uid>: any local user could create that first, and every
+    // /tmp/Aether-<uid>: any local user could create that first, and every
     // launch would then hand its path to their server and quit.
-    const QString hyprfmSocketName =
+    const QString aetherSocketName =
         QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation)
-        + QStringLiteral("/hyprfm-expanded.sock");
+        + QStringLiteral("/Aether.sock");
     QLocalServer *ipcServer = nullptr;
     bool isPrimary = false;
     {
         QLocalSocket probe;
-        probe.connectToServer(hyprfmSocketName);
+        probe.connectToServer(aetherSocketName);
         const bool instanceRunning = probe.waitForConnected(150);
 
         if (instanceRunning) {
@@ -757,11 +757,11 @@ int main(int argc, char *argv[])
             // would block listen(). Two instances starting at the exact same
             // moment can both land here; the second simply wins the socket,
             // which costs nothing but the first one's handoff duty.
-            QLocalServer::removeServer(hyprfmSocketName);
+            QLocalServer::removeServer(aetherSocketName);
             ipcServer = new QLocalServer(&app);
             ipcServer->setSocketOptions(QLocalServer::UserAccessOption);
-            if (!ipcServer->listen(hyprfmSocketName))
-                qWarning() << "HyprFM: single-instance IPC listen failed:" << ipcServer->errorString();
+            if (!ipcServer->listen(aetherSocketName))
+                qWarning() << "Aether: single-instance IPC listen failed:" << ipcServer->errorString();
             isPrimary = ipcServer->isListening();
         }
     }
@@ -806,10 +806,10 @@ int main(int argc, char *argv[])
         return font;
     };
 
-    // Keep this fork's settings separate from the installed HyprFM app.
+    // Keep this fork's settings separate from the previously installed app.
     const QString defaultConfigDir = QDir::homePath()
-        + QStringLiteral("/.config/hyprfm-expanded");
-    const QString configDir = qEnvironmentVariable("HYPRFM_CONFIG_DIR", defaultConfigDir);
+        + QStringLiteral("/.config/Aether");
+    const QString configDir = qEnvironmentVariable("AETHER_CONFIG_DIR", defaultConfigDir);
     QDir().mkpath(configDir);
     const QString configPath = configDir + "/config.toml";
 
@@ -824,22 +824,22 @@ int main(int argc, char *argv[])
 
     const QString appDir = QCoreApplication::applicationDirPath();
     const QString dataDir = firstExistingDir({
-        QDir(appDir).filePath("../share/hyprfm"),
-        QDir(appDir).filePath("../../share/hyprfm"),
-        QStringLiteral(HYPRFM_DATA_DIR),
-        QStringLiteral(HYPRFM_SOURCE_DIR),
+        QDir(appDir).filePath("../share/Aether"),
+        QDir(appDir).filePath("../../share/Aether"),
+        QStringLiteral(AETHER_DATA_DIR),
+        QStringLiteral(AETHER_SOURCE_DIR),
     });
 
     QStringList themeSearchPaths = {
         QDir(appDir).filePath("../themes"),
         QDir(appDir).filePath("../../themes"),
-        QStringLiteral(HYPRFM_DATA_DIR) + "/themes",
-        QStringLiteral(HYPRFM_SOURCE_DIR) + "/themes",
+        QStringLiteral(AETHER_DATA_DIR) + "/themes",
+        QStringLiteral(AETHER_SOURCE_DIR) + "/themes",
     };
     if (!dataDir.isEmpty())
         themeSearchPaths.prepend(QDir(dataDir).filePath("themes"));
 
-    // User themes come first so ~/.config/hyprfm/themes can add to or override
+    // User themes come first so ~/.config/Aether/themes can add to or override
     // the bundled set.
     QStringList themeDirs;
     const QString userThemesDir = configDir + "/themes";
@@ -857,9 +857,9 @@ int main(int argc, char *argv[])
     if (!themesDir.isEmpty())
         themeDirs.append(themesDir);
     if (dataDir.isEmpty())
-        qWarning() << "HyprFM: unable to locate data directory";
+        qWarning() << "Aether: unable to locate data directory";
     if (themesDir.isEmpty())
-        qWarning() << "HyprFM: unable to locate themes directory";
+        qWarning() << "Aether: unable to locate themes directory";
 
     // Only used the first time, while config.toml has no "theme": pick the
     // bundled theme that matches the desktop rather than always landing on the
@@ -953,13 +953,13 @@ int main(int argc, char *argv[])
 
     QQmlApplicationEngine engine;
 
-    // HyprFM and Quill are both compiled in. These paths only serve the
-    // on-disk fallback copy of the HyprFM module (see below). No source-tree
+    // Aether and Quill are both compiled in. These paths only serve the
+    // on-disk fallback copy of the Aether module (see below). No source-tree
     // path: an installed binary preferred it over its own install whenever
     // the build tree it was built in still existed.
     if (!dataDir.isEmpty())
         engine.addImportPath(dataDir);
-    engine.addImportPath(QStringLiteral(HYPRFM_DATA_DIR));
+    engine.addImportPath(QStringLiteral(AETHER_DATA_DIR));
 
     // An unset icon theme follows the desktop; Adwaita is the last resort when
     // nothing answers. Resolved inside ConfigManager so QML's config.iconTheme
@@ -1007,12 +1007,12 @@ int main(int argc, char *argv[])
     // with NO_CACHEGEN dropped SettingsPanel.qml from it in v0.4.14).
     mark("engine.load start");
     QQmlComponent mainComponent(&engine);
-    mainComponent.loadFromModule("HyprFM", "Main");
+    mainComponent.loadFromModule("Aether", "Main");
     const QString installedMainQml = dataDir.isEmpty()
         ? QString()
-        : QDir(dataDir).filePath(QStringLiteral("HyprFM/qml/Main.qml"));
+        : QDir(dataDir).filePath(QStringLiteral("Aether/qml/Main.qml"));
     if (mainComponent.isError() && !installedMainQml.isEmpty() && QFile::exists(installedMainQml)) {
-        qWarning() << "HyprFM: embedded QML module failed to load, falling back to" << installedMainQml
+        qWarning() << "Aether: embedded QML module failed to load, falling back to" << installedMainQml
                    << mainComponent.errorString();
         mainComponent.loadUrl(QUrl::fromLocalFile(installedMainQml));
     }
@@ -1025,7 +1025,7 @@ int main(int argc, char *argv[])
         if (!window)
             return;
 
-#ifdef HYPRFM_HAS_KWINDOWSYSTEM
+#ifdef AETHER_HAS_KWINDOWSYSTEM
         // KWin blur only shows through translucent content; Hyprland keeps
         // using compositor rules against the same transparent window surface.
         const bool blurRequested = config->transparencyEnabled();
@@ -1040,7 +1040,7 @@ int main(int argc, char *argv[])
     };
 
     // ── Windows ───────────────────────────────────────────────────────────
-    // Every window runs in this one process. Launching HyprFM again while it
+    // Every window runs in this one process. Launching Aether again while it
     // runs asks it for another window over the socket instead of starting a
     // second process: the compiled QML, the shared services, the GPU device
     // and the libraries are already there, which made a second window
@@ -1140,7 +1140,7 @@ int main(int argc, char *argv[])
         QObject *root = mainComponent.create(context);
         w->window = qobject_cast<QQuickWindow *>(root);
         if (!w->window) {
-            qWarning().noquote() << "HyprFM: could not create a window:" << mainComponent.errorString();
+            qWarning().noquote() << "Aether: could not create a window:" << mainComponent.errorString();
             delete root;
             delete w;
             return nullptr;

@@ -1,23 +1,23 @@
-# Flatpak manifest for HyprFM.
+# Flatpak manifest for Aether.
 #
 # Local build (run from repo root after committing your changes):
 #
 #   flatpak install -y flathub org.kde.Platform//6.9 org.kde.Sdk//6.9
 #   flatpak-builder --force-clean --user --install \
-#       build-flatpak io.github.soyeb_jim285.HyprFM.yml
-#   flatpak run io.github.soyeb_jim285.HyprFM
+#       build-flatpak io.github.adem7u3838e626.Aether.yml
+#   flatpak run io.github.adem7u3838e626.Aether
 #
-# For local iteration without committing, swap the `hyprfm` module's source
+# For local iteration without committing, swap the `aether` module's source
 # from `type: git` to `type: dir, path: .` (see comment below).
 #
 # For Flathub submission, this file is copied to a separate flathub repo
-# and the `hyprfm` source must stay as `type: git` with a pinned tag/commit.
+# and the `aether` source must stay as `type: git` with a pinned tag/commit.
 
-app-id: io.github.soyeb_jim285.HyprFM
+app-id: io.github.adem7u3838e626.Aether
 runtime: org.kde.Platform
 runtime-version: '6.9'
 sdk: org.kde.Sdk
-command: hyprfm
+command: aether
 
 finish-args:
   # Display + input
@@ -127,7 +127,7 @@ modules:
         url: https://github.com/sharkdp/bat/releases/download/v0.24.0/bat-v0.24.0-aarch64-unknown-linux-gnu.tar.gz
         sha256: feccae9a0576d97609c57e32d3914c5116136eab0df74c2ab74ef397d42c5b10
 
-  # ── HyprFM ─────────────────────────────────────────────────────────────
+  # ── Aether ─────────────────────────────────────────────────────────────
   # ── poppler-utils ──────────────────────────────────────────────────────
   # PdfPreviewProvider, PreviewService and MetadataExtractor shell out to
   # pdftoppm and pdfinfo for PDF thumbnails, the quick-preview panel and PDF
@@ -172,7 +172,7 @@ modules:
         url: https://poppler.freedesktop.org/poppler-26.08.0.tar.xz
         sha256: dc906e68cea698109706ac6aa3d2c9d4512fcfcac42d90b8afcda486d1b9abd0
     cleanup:
-      # It builds thirteen utils; hyprfm calls two.
+      # It builds thirteen utils; aether calls two.
       - /bin/pdfattach
       - /bin/pdfdetach
       - /bin/pdffonts
@@ -206,23 +206,23 @@ modules:
         url: https://github.com/mity/md4c/archive/refs/tags/release-0.5.3.tar.gz
         sha256: 353c346f376b87c954a13f3415ede2d51264cc61dc5abcd38ff1d2aa0d059b9e
 
-  - name: hyprfm
+  - name: aether
     buildsystem: cmake-ninja
     config-opts:
       - -DCMAKE_BUILD_TYPE=Release
       - -DCMAKE_INSTALL_PREFIX=/app
-      - -DHYPRFM_DATA_DIR=/app/share/hyprfm
+      - -DAETHER_DATA_DIR=/app/share/Aether
       - -DBUILD_TESTS=OFF
-      - -DHYPRFM_ENABLE_PCH=OFF
-      - -DHYPRFM_ENABLE_UNITY_BUILD=OFF
+      - -DAETHER_ENABLE_PCH=OFF
+      - -DAETHER_ENABLE_UNITY_BUILD=OFF
     post-install:
       # Required by Flathub: every app must install its license file to
       # $FLATPAK_DEST/share/licenses/$FLATPAK_ID.
-      - install -Dm644 LICENSE /app/share/licenses/io.github.soyeb_jim285.HyprFM/LICENSE
+      - install -Dm644 LICENSE /app/share/licenses/io.github.adem7u3838e626.Aether/LICENSE
     sources:
       # ── FLATHUB SUBMISSION ──
       - type: git
-        url: https://github.com/soyeb-jim285/hyprfm.git
+        url: https://github.com/Adem7u3838e626/hyprfm.git
         tag: v0.6.1
 
       # ── LOCAL ITERATION ──

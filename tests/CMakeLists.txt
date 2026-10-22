@@ -129,7 +129,7 @@ target_compile_definitions(tst_detailedview PRIVATE
     TEST_MODULE_DIR="${CMAKE_BINARY_DIR}/src"
 )
 target_link_libraries(tst_detailedview PRIVATE Qt6::Test Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::Concurrent PkgConfig::GIO)
-add_dependencies(tst_detailedview hyprfm)
+add_dependencies(tst_detailedview aether)
 add_test(NAME tst_detailedview COMMAND tst_detailedview)
 
 add_executable(tst_millerview tst_millerview.cpp viewharness.h
@@ -151,7 +151,7 @@ target_compile_definitions(tst_millerview PRIVATE
     TEST_MODULE_DIR="${CMAKE_BINARY_DIR}/src"
 )
 target_link_libraries(tst_millerview PRIVATE Qt6::Test Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::Concurrent Qt6::DBus PkgConfig::GIO)
-add_dependencies(tst_millerview hyprfm)
+add_dependencies(tst_millerview aether)
 add_test(NAME tst_millerview COMMAND tst_millerview)
 
 add_executable(tst_viewcontextmenu tst_viewcontextmenu.cpp viewharness.h
@@ -173,7 +173,7 @@ target_compile_definitions(tst_viewcontextmenu PRIVATE
     TEST_MODULE_DIR="${CMAKE_BINARY_DIR}/src"
 )
 target_link_libraries(tst_viewcontextmenu PRIVATE Qt6::Test Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::Concurrent Qt6::DBus PkgConfig::GIO)
-add_dependencies(tst_viewcontextmenu hyprfm)
+add_dependencies(tst_viewcontextmenu aether)
 add_test(NAME tst_viewcontextmenu COMMAND tst_viewcontextmenu)
 
 add_executable(tst_toolbar tst_toolbar.cpp viewharness.h
@@ -188,7 +188,7 @@ add_executable(tst_toolbar tst_toolbar.cpp viewharness.h
 target_include_directories(tst_toolbar PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/third_party)
 target_compile_definitions(tst_toolbar PRIVATE TEST_SOURCE_DIR="${CMAKE_SOURCE_DIR}" TEST_MODULE_DIR="${CMAKE_BINARY_DIR}/src")
 target_link_libraries(tst_toolbar PRIVATE Qt6::Test Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::Concurrent PkgConfig::GIO)
-add_dependencies(tst_toolbar hyprfm)
+add_dependencies(tst_toolbar aether)
 add_test(NAME tst_toolbar COMMAND tst_toolbar)
 
 add_executable(tst_mainwindow tst_mainwindow.cpp
@@ -227,12 +227,12 @@ target_include_directories(tst_mainwindow PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAK
 target_compile_definitions(tst_mainwindow PRIVATE
     TEST_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
     TEST_MODULE_DIR="${CMAKE_BINARY_DIR}/src"
-    HYPRFM_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
-    HYPRFM_DATA_DIR="${CMAKE_SOURCE_DIR}"
-    HYPRFM_VERSION="test"
+    AETHER_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+    AETHER_DATA_DIR="${CMAKE_SOURCE_DIR}"
+    AETHER_VERSION="test"
 )
 target_link_libraries(tst_mainwindow PRIVATE Qt6::Test Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::DBus Qt6::Svg Qt6::Network Qt6::Concurrent PkgConfig::GIO)
-add_dependencies(tst_mainwindow hyprfm)
+add_dependencies(tst_mainwindow aether)
 add_test(NAME tst_mainwindow COMMAND tst_mainwindow)
 
 # The view harnesses assert pixel geometry of a 900x600 window; a tiling
@@ -316,7 +316,7 @@ set_tests_properties(tst_giotransferworker PROPERTIES
 # Multi-window / single-instance arbitration lives in main(), so it is covered
 # by driving the real binary. Skips itself (exit 77) without a Wayland session.
 add_test(NAME tst_instance_launch
-    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tst_instance_launch.sh $<TARGET_FILE:hyprfm>
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tst_instance_launch.sh $<TARGET_FILE:aether>
 )
 set_tests_properties(tst_instance_launch PROPERTIES
     SKIP_RETURN_CODE 77
@@ -326,13 +326,13 @@ set_tests_properties(tst_instance_launch PROPERTIES
 
 # --help / --version answer before any Qt GUI setup, so unlike the launch test
 # these run anywhere, including headless CI.
-add_test(NAME tst_cli_help COMMAND hyprfm --help)
+add_test(NAME tst_cli_help COMMAND aether --help)
 set_tests_properties(tst_cli_help PROPERTIES
     PASS_REGULAR_EXPRESSION "-n, --new-window"
 )
-add_test(NAME tst_cli_version COMMAND hyprfm --version)
+add_test(NAME tst_cli_version COMMAND aether --version)
 set_tests_properties(tst_cli_version PROPERTIES
-    PASS_REGULAR_EXPRESSION "^hyprfm [0-9]+\\.[0-9]+\\.[0-9]+"
+    PASS_REGULAR_EXPRESSION "^aether [0-9]+\\.[0-9]+\\.[0-9]+"
 )
 
 add_executable(tst_xdgtrash tst_xdgtrash.cpp

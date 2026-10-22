@@ -57,19 +57,19 @@ jobs:
             fi
           }
 
-          cmake_ver=$(grep -E '^project\(hyprfm VERSION' CMakeLists.txt \
-                       | sed -E 's/^project\(hyprfm VERSION ([0-9.]+).*/\1/')
+          cmake_ver=$(grep -E '^project\(aether VERSION' CMakeLists.txt \
+                       | sed -E 's/^project\(aether VERSION ([0-9.]+).*/\1/')
           check "CMakeLists.txt" "$VERSION" "$cmake_ver"
 
           flatpak_tag=$(python3 -c '
           import re
-          t = open("io.github.soyeb_jim285.HyprFM.yml").read()
-          m = re.search(r"url:\s*https://github\.com/soyeb-jim285/hyprfm\.git\s*\n(?:[^\n]*\n)*?\s*tag:\s*(v\d+\.\d+\.\d+)", t)
+          t = open("io.github.adem7u3838e626.Aether.yml").read()
+          m = re.search(r"url:\s*https://github\.com/Adem7u3838e626/hyprfm\.git\s*\n(?:[^\n]*\n)*?\s*tag:\s*(v\d+\.\d+\.\d+)", t)
           print(m.group(1) if m else "")
           ')
-          check "flatpak manifest hyprfm tag" "$TAG" "$flatpak_tag"
+          check "flatpak manifest aether tag" "$TAG" "$flatpak_tag"
 
-          if grep -q "<release version=\"$VERSION\"" dist/io.github.soyeb_jim285.HyprFM.metainfo.xml; then
+          if grep -q "<release version=\"$VERSION\"" dist/io.github.adem7u3838e626.Aether.metainfo.xml; then
             echo "OK   metainfo.xml <release> entry present"
           else
             echo "::error::metainfo.xml is missing a <release version=\"$VERSION\"> entry"
@@ -169,15 +169,15 @@ jobs:
 
       - name: Build
         run: |
-          # HYPRFM_ENABLE_QML_CACHEGEN=ON forces qmlcachegen to compile QML
+          # AETHER_ENABLE_QML_CACHEGEN=ON forces qmlcachegen to compile QML
           # files into the binary. The NO_CACHEGEN code path in Qt 6.7.3 was
           # silently dropping qml/components/SettingsPanel.qml from the qrc;
           # cachegen uses a different rcc path that's more reliable.
           cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX=/usr \
-            -DHYPRFM_DATA_DIR=/usr/share/hyprfm \
-            -DHYPRFM_ENABLE_QML_CACHEGEN=ON
+            -DAETHER_DATA_DIR=/usr/share/Aether \
+            -DAETHER_ENABLE_QML_CACHEGEN=ON
           cmake --build build --parallel
 
       - name: Run tests
@@ -226,8 +226,8 @@ jobs:
           ./linuxdeploy-x86_64.AppImage \
             --appdir AppDir \
             --plugin qt \
-            --desktop-file dist/io.github.soyeb_jim285.HyprFM.desktop \
-            --icon-file dist/io.github.soyeb_jim285.HyprFM.svg
+            --desktop-file dist/io.github.adem7u3838e626.Aether.desktop \
+            --icon-file dist/io.github.adem7u3838e626.Aether.svg
 
           deploy_deps_args=()
           for plugin_dir in \
@@ -251,7 +251,7 @@ jobs:
 
           scripts/prune-appdir.sh AppDir
 
-          OUTPUT="HyprFM-${TAG_NAME}-x86_64.AppImage" \
+          OUTPUT="Aether-${TAG_NAME}-x86_64.AppImage" \
           ./linuxdeploy-x86_64.AppImage \
             --appdir AppDir \
             "${deploy_deps_args[@]}" \
@@ -295,11 +295,11 @@ jobs:
         # ships. v0.4.14 shipped a broken AppImage exactly because we had no
         # such gate; never again.
         run: |
-          chmod +x "HyprFM-${TAG_NAME}-x86_64.AppImage"
+          chmod +x "Aether-${TAG_NAME}-x86_64.AppImage"
           set +e
           # offscreen platform needs no display; software RHI dodges Mesa.
           QT_QPA_PLATFORM=offscreen QSG_RHI_BACKEND=software \
-            timeout 10 "./HyprFM-${TAG_NAME}-x86_64.AppImage" \
+            timeout 10 "./Aether-${TAG_NAME}-x86_64.AppImage" \
             > smoke.stdout 2> smoke.stderr &
           SMOKE_PID=$!
           # Give the QML engine ~5s to parse Main.qml and instantiate every
@@ -331,8 +331,8 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: hyprfm-appimage
-          path: HyprFM-${{ github.ref_name }}-x86_64.AppImage
+          name: aether-appimage
+          path: Aether-${{ github.ref_name }}-x86_64.AppImage
           if-no-files-found: error
 
   # The flake can't fetch git submodules, so it pins Quill and quill-icons by
@@ -364,7 +364,7 @@ jobs:
         uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
 
       - name: Build flake
-        run: nix build .#hyprfm --print-build-logs
+        run: nix build .#aether --print-build-logs
 
   # "Run workflow" also builds the Flatpak, from this commit instead of the
   # release tag the manifest pins, and uploads the bundle as an artifact:
@@ -391,22 +391,22 @@ jobs:
           SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          manifest=io.github.soyeb_jim285.HyprFM.yml
-          # Only the tag right under HyprFM's own url: other modules pin tags too.
-          sed -i "\|url: https://github.com/soyeb-jim285/hyprfm.git|{n;s|tag: .*|commit: $SHA|}" "$manifest"
+          manifest=io.github.adem7u3838e626.Aether.yml
+          # Only the tag right under Aether's own url: other modules pin tags too.
+          sed -i "\|url: https://github.com/Adem7u3838e626/hyprfm.git|{n;s|tag: .*|commit: $SHA|}" "$manifest"
           grep -q "commit: $SHA" "$manifest"
           flatpak-builder --force-clean --user \
             --repo=flatpak-repo \
             --default-branch=stable \
             flatpak-build "$manifest"
-          flatpak build-bundle flatpak-repo HyprFM-dry-run-x86_64.flatpak \
-            io.github.soyeb_jim285.HyprFM stable
+          flatpak build-bundle flatpak-repo Aether-dry-run-x86_64.flatpak \
+            io.github.adem7u3838e626.Aether stable
 
       - name: Upload Flatpak bundle
         uses: actions/upload-artifact@v4
         with:
-          name: hyprfm-flatpak
-          path: HyprFM-dry-run-x86_64.flatpak
+          name: aether-flatpak
+          path: Aether-dry-run-x86_64.flatpak
           if-no-files-found: error
 
   release:
@@ -423,13 +423,10 @@ jobs:
       - name: Download AppImage artifact
         uses: actions/download-artifact@v4
         with:
-          name: hyprfm-appimage
+          name: aether-appimage
 
       # ─────────────────────────────────────────────────────────────────
-      # Flatpak publishing: build, sign with GPG, upload the ostree repo
-      # to soyeb-jim285/hyprfm-flatpak-repo (served at hyprfm.soyebjim.me
-      # via GitHub Pages) and export a single-file bundle as a release
-      # asset. Gated on tag pushes only so main-branch CI stays fast.
+      # Build an installable Flatpak bundle as a release artifact.
 
       - name: Install Flatpak tooling
         if: startsWith(github.ref, 'refs/tags/v')
@@ -440,114 +437,28 @@ jobs:
           flatpak install -y --user flathub \
               org.kde.Platform//6.9 org.kde.Sdk//6.9
 
-      - name: Import GPG signing key
+      - name: Build Flatpak repo
         if: startsWith(github.ref, 'refs/tags/v')
-        env:
-          GPG_KEY: ${{ secrets.FLATPAK_GPG_PRIVATE_KEY }}
-          GPG_PASSPHRASE: ${{ secrets.FLATPAK_GPG_PASSPHRASE }}
-          GPG_FINGERPRINT: ${{ secrets.FLATPAK_GPG_FINGERPRINT }}
-        run: |
-          mkdir -p "$HOME/.gnupg"
-          chmod 700 "$HOME/.gnupg"
-
-          # Configure gpg-agent to accept passphrases via --passphrase
-          # rather than prompting through pinentry. GitHub Actions runners
-          # have no TTY, so interactive pinentry fails with "Inappropriate
-          # ioctl for device" the moment ostree tries to sign a commit.
-          cat > "$HOME/.gnupg/gpg-agent.conf" <<'EOF'
-          allow-loopback-pinentry
-          allow-preset-passphrase
-          default-cache-ttl 7200
-          max-cache-ttl 7200
-          EOF
-          cat > "$HOME/.gnupg/gpg.conf" <<'EOF'
-          use-agent
-          pinentry-mode loopback
-          EOF
-          gpg-connect-agent reloadagent /bye
-
-          # Import the private key
-          printf '%s' "$GPG_KEY" | gpg --batch --import
-          gpg --list-secret-keys --keyid-format=long
-
-          # Prime the gpg-agent cache with the passphrase by doing one
-          # dummy signing operation. Subsequent sign calls from
-          # flatpak-builder / ostree will hit the cache instead of
-          # triggering pinentry. If the key has no passphrase,
-          # --passphrase "" is a valid empty input.
-          echo test | gpg --batch --yes \
-              --pinentry-mode loopback \
-              --passphrase "${GPG_PASSPHRASE:-}" \
-              --local-user "$GPG_FINGERPRINT" \
-              --clearsign > /dev/null
-
-      - name: Build and sign Flatpak repo
-        if: startsWith(github.ref, 'refs/tags/v')
-        env:
-          GPG_FINGERPRINT: ${{ secrets.FLATPAK_GPG_FINGERPRINT }}
         run: |
           flatpak-builder --force-clean --user \
             --repo=flatpak-repo \
-            --gpg-sign="$GPG_FINGERPRINT" \
             --default-branch=stable \
             flatpak-build \
-            io.github.soyeb_jim285.HyprFM.yml
+            io.github.adem7u3838e626.Aether.yml
           # Generate static deltas for efficient incremental updates
-          # and re-sign the summary file.
+          # in the local repository.
           flatpak build-update-repo \
             --generate-static-deltas \
-            --gpg-sign="$GPG_FINGERPRINT" \
             flatpak-repo
 
       - name: Build Flatpak bundle (release asset)
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           TAG_NAME: ${{ github.ref_name }}
-          GPG_FINGERPRINT: ${{ secrets.FLATPAK_GPG_FINGERPRINT }}
         run: |
           flatpak build-bundle flatpak-repo \
-            "HyprFM-${TAG_NAME}-x86_64.flatpak" \
-            io.github.soyeb_jim285.HyprFM stable \
-            --gpg-sign="$GPG_FINGERPRINT"
-
-      - name: Publish ostree repo to hyprfm-flatpak-repo
-        if: startsWith(github.ref, 'refs/tags/v')
-        env:
-          DEPLOY_KEY: ${{ secrets.FLATPAK_REPO_DEPLOY_KEY }}
-          TAG_NAME: ${{ github.ref_name }}
-        run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          # printf '%s\n' guarantees a terminating newline; OpenSSH's
-          # PEM parser rejects keys without one with a cryptic
-          # "error in libcrypto" message.
-          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -t ed25519,rsa,ecdsa github.com >> ~/.ssh/known_hosts 2>/dev/null
-
-          # Sanity check the key parses cleanly before SSH does.
-          if ! ssh-keygen -l -f ~/.ssh/id_ed25519 > /dev/null; then
-            echo "Deploy key failed to parse. First and last lines:"
-            head -1 ~/.ssh/id_ed25519
-            tail -1 ~/.ssh/id_ed25519
-            exit 1
-          fi
-
-          git clone git@github.com:soyeb-jim285/hyprfm-flatpak-repo.git pages
-          cd pages
-          git config user.name "hyprfm release bot"
-          git config user.email "release-bot@hyprfm.local"
-
-          rm -rf repo
-          cp -a ../flatpak-repo repo
-
-          git add -A repo/
-          if git diff --cached --quiet; then
-            echo "No changes to publish"
-          else
-            git commit -m "Publish io.github.soyeb_jim285.HyprFM ${TAG_NAME}"
-            git push origin main
-          fi
+            "Aether-${TAG_NAME}-x86_64.flatpak" \
+            io.github.adem7u3838e626.Aether stable
 
       # The annotated tag's message is the release notes (scripts/release.sh
       # writes it from a notes file), so the body is reviewed before the push
@@ -567,14 +478,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            HyprFM-${{ github.ref_name }}-x86_64.AppImage
-            HyprFM-${{ github.ref_name }}-x86_64.flatpak
+            Aether-${{ github.ref_name }}-x86_64.AppImage
+            Aether-${{ github.ref_name }}-x86_64.flatpak
           body_path: release-notes.md
-
-      - name: Trigger website rebuild
-        if: startsWith(github.ref, 'refs/tags/v')
-        env:
-          GH_TOKEN: ${{ secrets.SITE_DISPATCH_TOKEN }}
-        run: |
-          gh api repos/soyeb-jim285/hyprfm-site/dispatches \
-            -f event_type=new-release

@@ -62,19 +62,19 @@ class TestMainWindow : public QObject
 
         bool load()
         {
-            QDir().mkpath(moduleDir.path() + "/HyprFM");
-            QFile src(QStringLiteral(TEST_MODULE_DIR "/HyprFM/qmldir"));
-            QFile dst(moduleDir.path() + "/HyprFM/qmldir");
+            QDir().mkpath(moduleDir.path() + "/Aether");
+            QFile src(QStringLiteral(TEST_MODULE_DIR "/Aether/qmldir"));
+            QFile dst(moduleDir.path() + "/Aether/qmldir");
             if (!src.open(QIODevice::ReadOnly) || !dst.open(QIODevice::WriteOnly))
                 return false;
             for (const QByteArray &line : src.readAll().split('\n'))
                 if (!line.startsWith("prefer "))
                     dst.write(line + '\n');
             dst.close();
-            QFile::link(QStringLiteral(TEST_MODULE_DIR "/HyprFM/qml"), moduleDir.path() + "/HyprFM/qml");
+            QFile::link(QStringLiteral(TEST_MODULE_DIR "/Aether/qml"), moduleDir.path() + "/Aether/qml");
 
             QQuickStyle::setStyle("Basic");
-            const QString configDir = home.path() + "/.config/hyprfm";
+            const QString configDir = home.path() + "/.config/Aether";
             QDir().mkpath(configDir);
             const QStringList themeDirs {QStringLiteral(TEST_SOURCE_DIR "/themes")};
 
@@ -250,9 +250,9 @@ private slots:
         QVERIFY(statusBar);
         QTRY_COMPARE(statusBar->property("itemCount").toInt(), app.searchProxy->rowCount());
 
-        if (qEnvironmentVariableIsSet("HYPRFM_TEST_GRAB")) {
+        if (qEnvironmentVariableIsSet("AETHER_TEST_GRAB")) {
             QTest::qWait(800);   // let the add transition finish
-            app.window->grabWindow().save(qEnvironmentVariable("HYPRFM_TEST_GRAB"));
+            app.window->grabWindow().save(qEnvironmentVariable("AETHER_TEST_GRAB"));
         }
     }
 
@@ -427,9 +427,9 @@ private slots:
                                         .arg(name).arg(labelEnd).arg(value->x())));
         }
 
-        if (qEnvironmentVariableIsSet("HYPRFM_TEST_GRAB")) {
+        if (qEnvironmentVariableIsSet("AETHER_TEST_GRAB")) {
             QTest::qWait(500);
-            app.window->grabWindow().save(qEnvironmentVariable("HYPRFM_TEST_GRAB"));
+            app.window->grabWindow().save(qEnvironmentVariable("AETHER_TEST_GRAB"));
         }
     }
 
@@ -667,8 +667,8 @@ private slots:
     void testToggleSplitOrientationFromConfigDefault()
     {
         App app;
-        QDir().mkpath(app.home.path() + "/.config/hyprfm");
-        QFile cfg(app.home.path() + "/.config/hyprfm/config.toml");
+        QDir().mkpath(app.home.path() + "/.config/Aether");
+        QFile cfg(app.home.path() + "/.config/Aether/config.toml");
         QVERIFY(cfg.open(QIODevice::WriteOnly));
         cfg.write("[general]\nsplit_orientation = \"horizontal\"\n");
         cfg.close();
@@ -890,7 +890,7 @@ private slots:
     void testSingleClickOpensFolders()
     {
         App app;
-        const QString configDir = app.home.path() + "/.config/hyprfm";
+        const QString configDir = app.home.path() + "/.config/Aether";
         QDir().mkpath(configDir);
         {
             QFile f(configDir + "/config.toml");
@@ -1189,9 +1189,9 @@ private slots:
         QTest::qWait(50);
         QVERIFY(!window->property("sidebarVisible").toBool());
 
-        // HYPRFM_TEST_GRAB=<prefix> writes wide/narrow frames for eyeballing.
-        if (qEnvironmentVariableIsSet("HYPRFM_TEST_GRAB")) {
-            const QString prefix = qEnvironmentVariable("HYPRFM_TEST_GRAB");
+        // AETHER_TEST_GRAB=<prefix> writes wide/narrow frames for eyeballing.
+        if (qEnvironmentVariableIsSet("AETHER_TEST_GRAB")) {
+            const QString prefix = qEnvironmentVariable("AETHER_TEST_GRAB");
             QMetaObject::invokeMethod(window, "toggleSidebar");   // back on
             QTest::qWait(400);
             window->grabWindow().save(prefix + QStringLiteral("-wide.png"));

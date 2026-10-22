@@ -1,9 +1,9 @@
 #!/bin/bash
-# Syncs PKGBUILD + .SRCINFO to the AUR repo after pushing hyprfm
+# Syncs PKGBUILD + .SRCINFO to the AUR repo after pushing aether
 set -e
 
-MAIN_REPO="$HOME/hyprfm"
-AUR_REPO="$HOME/hyprfm-aur"
+MAIN_REPO="$HOME/aether"
+AUR_REPO="$HOME/aether-aur"
 
 cd "$MAIN_REPO"
 

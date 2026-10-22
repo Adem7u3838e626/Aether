@@ -186,7 +186,7 @@ static void saveCachedThumbnail(const QString &sourcePath,
         QUrl::fromLocalFile(sourcePath).toString(QUrl::FullyEncoded));
     tagged.setText(QStringLiteral("Thumb::MTime"),
         QString::number(srcInfo.lastModified().toSecsSinceEpoch()));
-    tagged.setText(QStringLiteral("Software"), QStringLiteral("HyprFM"));
+    tagged.setText(QStringLiteral("Software"), QStringLiteral("Aether"));
 
     // QSaveFile ensures we don't end up with a half-written PNG if we race
     // with another process writing the same thumbnail.

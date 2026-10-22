@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
-import HyprFM
+import Aether
 import Quill as Q
 
 // A yes/no dialog: a line of prose and two buttons. Callers set `message`,

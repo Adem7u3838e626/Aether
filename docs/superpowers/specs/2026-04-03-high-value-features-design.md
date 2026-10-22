@@ -1,6 +1,6 @@
 # High-Value Features Design Spec
 
-Five features to fill the most impactful gaps in HyprFM. Implementation order: symlink creation, bulk rename, directory size calculation, per-directory preferences, split pane.
+Five features to fill the most impactful gaps in Aether. Implementation order: symlink creation, bulk rename, directory size calculation, per-directory preferences, split pane.
 
 ---
 

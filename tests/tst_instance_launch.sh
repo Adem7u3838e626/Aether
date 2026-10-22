@@ -3,11 +3,11 @@
 # main.cpp. Everything here needs real processes and a real unix socket, so it
 # lives as a script rather than a QtTest case.
 #
-# Skips (exit 77) when there is no Wayland session, since HyprFM refuses to
+# Skips (exit 77) when there is no Wayland session, since Aether refuses to
 # start without one — that is the case on CI runners.
 set -u
 
-HYPRFM=${1:?usage: tst_instance_launch.sh /path/to/hyprfm}
+AETHER=${1:?usage: tst_instance_launch.sh /path/to/aether}
 
 [ -n "${WAYLAND_DISPLAY:-}" ] || { echo "SKIP: no WAYLAND_DISPLAY"; exit 77; }
 
@@ -22,7 +22,7 @@ PIDS=()
 trap cleanup EXIT
 
 # The instance socket lives in the runtime directory. Pointing XDG_RUNTIME_DIR
-# at the sandbox keeps any HyprFM the developer is running on its own socket,
+# at the sandbox keeps any Aether the developer is running on its own socket,
 # so it never takes part in these handoffs. The Wayland and Hyprland sockets
 # stay in the real one: WAYLAND_DISPLAY may be an absolute path.
 REAL_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
@@ -36,13 +36,13 @@ export TMPDIR="$SANDBOX/tmp"
 mkdir -p "$TMPDIR"
 
 export HOME="$SANDBOX/home"
-# HyprFM follows XDG_CONFIG_HOME, which a desktop session often sets to the
+# Aether follows XDG_CONFIG_HOME, which a desktop session often sets to the
 # real ~/.config: keep it inside the sandbox too.
 export XDG_CONFIG_HOME="$HOME/.config"
 export XDG_CACHE_HOME="$HOME/.cache"
-mkdir -p "$HOME/.config/hyprfm"
-SESSION="$HOME/.config/hyprfm/session.json"
-SOCKET="$XDG_RUNTIME_DIR/hyprfm.sock"
+mkdir -p "$HOME/.config/Aether"
+SESSION="$HOME/.config/Aether/session.json"
+SOCKET="$XDG_RUNTIME_DIR/Aether.sock"
 
 failures=0
 
@@ -51,7 +51,7 @@ failures=0
 # command substitution, whose subshell would discard the PIDS append and leak
 # every window this test starts.
 spawn() {
-    "$HYPRFM" "$@" >/dev/null 2>&1 &
+    "$AETHER" "$@" >/dev/null 2>&1 &
     SPAWNED=$!
     PIDS+=("$SPAWNED")
     sleep 3
@@ -93,8 +93,8 @@ check "first launch owns the IPC socket" "$(socket_up && echo yes || echo no)" "
 # The session file only appears once something changes, hence the missing-file
 # tolerance on the "before" count.
 tabs_before=$(tabs)
-"$HYPRFM" /etc >/dev/null 2>&1
-check "hyprfm <path> exits 0 while an instance runs" "$?" "0"
+"$AETHER" /etc >/dev/null 2>&1
+check "aether <path> exits 0 while an instance runs" "$?" "0"
 wait_for 10 more_tabs_than "$tabs_before"
 check "handoff added a tab to the primary" \
       "$(more_tabs_than "$tabs_before" && echo yes || echo no)" "yes"
@@ -121,7 +121,7 @@ check_windows() {   # label, before
 }
 
 windows_before=$(windows_of "$primary")
-"$HYPRFM" >/dev/null 2>&1
+"$AETHER" >/dev/null 2>&1
 check "bare relaunch hands off and exits 0" "$?" "0"
 check_windows "bare relaunch opened a window in the primary" "$windows_before"
 
@@ -130,7 +130,7 @@ check_windows "bare relaunch opened a window in the primary" "$windows_before"
 # first window's geometry changes. What must never happen is another window's
 # tab landing in the file, so give it a path the first window does not have.
 windows_before=$(windows_of "$primary")
-"$HYPRFM" -n /usr >/dev/null 2>&1
+"$AETHER" -n /usr >/dev/null 2>&1
 check "--new-window <path> hands off and exits 0" "$?" "0"
 check_windows "--new-window opened a window in the primary" "$windows_before"
 sleep 1
@@ -145,7 +145,7 @@ check "crash leaves a stale socket behind" "$(socket_up && echo yes || echo no)"
 spawn; revived=$SPAWNED
 wait_for 20 socket_up
 check "launch after crash starts despite the stale socket" "$(yesno "$revived")" "yes"
-"$HYPRFM" /etc >/dev/null 2>&1
+"$AETHER" /etc >/dev/null 2>&1
 check "revived instance answers handoffs" "$?" "0"
 
 [ "$failures" -eq 0 ] || { echo "$failures check(s) failed"; exit 1; }

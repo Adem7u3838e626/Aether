@@ -1,12 +1,12 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Window
-import HyprFM
+import Aether
 import Quill as Q
 
 Window {
     id: root
-    title: "HyprFM Settings"
+    title: "Aether Settings"
     flags: Qt.Dialog | Qt.FramelessWindowHint
     color: "transparent"
 
@@ -173,7 +173,7 @@ Window {
         { title: "Layout", subtitle: "Sidebar behavior, file visibility, and toolbar controls.", iconComponent: layoutSectionIcon },
         { title: "Motion", subtitle: "Animation timing and easing across the interface.", iconComponent: motionSectionIcon },
         { title: "Tools", subtitle: "Shortcuts, remote locations, and config behavior.", iconComponent: toolsSectionIcon },
-        { title: "Plugins", subtitle: "Optional extensions for HyprFM.", iconComponent: pluginsSectionIcon }
+        { title: "Plugins", subtitle: "Optional extensions for Aether.", iconComponent: pluginsSectionIcon }
     ]
 
     function showSection(index) {
@@ -1272,7 +1272,7 @@ Window {
 
                     Text {
                         Layout.fillWidth: true
-                        text: "HyprFM does not currently load third-party extensions. This page will show plugin discovery and controls once extension support is available."
+                        text: "Aether does not currently load third-party extensions. This page will show plugin discovery and controls once extension support is available."
                         color: Theme.subtext
                         font.pointSize: Theme.fontSmall
                         horizontalAlignment: Text.AlignHCenter

@@ -26,7 +26,7 @@ private:
         QPainter painter(&writer);
         painter.setPen(Qt::black);
         painter.setFont(QFont(QStringLiteral("Sans"), 18));
-        painter.drawText(QPointF(96.0, 120.0), QStringLiteral("HyprFM PDF Preview"));
+        painter.drawText(QPointF(96.0, 120.0), QStringLiteral("Aether PDF Preview"));
         painter.end();
         return filePath;
     }
@@ -206,7 +206,7 @@ private slots:
             first = renderAndWait(provider, id, QSize(400, 500));
         }
         QVERIFY(!first.isNull());
-        QVERIFY(!QDir(cacheDir.path() + QStringLiteral("/hyprfm/pdf-pages"))
+        QVERIFY(!QDir(cacheDir.path() + QStringLiteral("/Aether/pdf-pages"))
                      .entryList({QStringLiteral("*.jpg")}, QDir::Files).isEmpty());
 
         // A provider with an empty in-memory cache still answers from disk.

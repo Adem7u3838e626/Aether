@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Shapes
-import HyprFM
+import Aether
 import Quill as Quill
 
 Rectangle {
@@ -86,7 +86,7 @@ Rectangle {
         anchors.fill: parent
         spacing: 0
 
-        // App header: "hyprfm" + collapse button
+        // App header: "aether" + collapse button
         Item {
             Layout.fillWidth: true
             height: 44
@@ -94,7 +94,7 @@ Rectangle {
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.verticalCenter: parent.verticalCenter
-                text: "Hyprfm"
+                text: "Aether"
                 color: Theme.text
                 font.pointSize: Theme.fontLarge
                 font.weight: Font.Bold

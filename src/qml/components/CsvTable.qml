@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Controls
-import HyprFM
+import Aether
 
 // Table preview for CSV/TSV: PreviewService's "table" (rows of cells, header
 // first, plus a width in characters per column). A ListView only builds the

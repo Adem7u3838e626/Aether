@@ -3,10 +3,10 @@
 #include <QLoggingCategory>
 #include <QUrl>
 
-// Turn on with QT_LOGGING_RULES="hyprfm.transfer.debug=true" to trace every
-// item. Warnings/errors go out unconditionally under hyprfm.transfer so the
+// Turn on with QT_LOGGING_RULES="aether.transfer.debug=true" to trace every
+// item. Warnings/errors go out unconditionally under aether.transfer so the
 // user sees failure reasons in the terminal.
-Q_LOGGING_CATEGORY(lcTransfer, "hyprfm.transfer")
+Q_LOGGING_CATEGORY(lcTransfer, "aether.transfer")
 
 namespace {
 
