@@ -1241,44 +1241,200 @@ Window {
             width: pageLoader.width
             spacing: 12
 
-            Rectangle {
+            RowLayout {
                 Layout.fillWidth: true
-                Layout.fillHeight: true
-                implicitHeight: 196
-                radius: Theme.radiusMedium
-                color: Theme.containerColor(Theme.surface, 0.22)
-                border.width: 1
-                border.color: root.sectionBorderColor
+                Text {
+                    Layout.fillWidth: true
+                    text: "Install Lua plugins in “%1”. Plugins run with the same permissions as Aether; only install code you trust. Changes take effect immediately."
+                        .arg(pluginManager.pluginDirectory)
+                    color: Theme.subtext
+                    font.pointSize: Theme.fontSmall
+                    wrapMode: Text.WordWrap
+                }
+                Q.Button {
+                    text: "Refresh"
+                    onClicked: pluginManager.refresh()
+                }
+            }
 
-                ColumnLayout {
-                    anchors.fill: parent
-                    anchors.margins: 20
-                    spacing: 10
-
-                    IconPackageOpen {
-                        Layout.alignment: Qt.AlignHCenter
-                        size: 28
-                        color: Theme.subtext
-                    }
-
-                    Text {
-                        Layout.fillWidth: true
-                        text: "Plugins are not supported yet"
-                        color: Theme.text
-                        font.pointSize: Theme.fontNormal
-                        font.bold: true
-                        horizontalAlignment: Text.AlignHCenter
-                    }
-
-                    Text {
-                        Layout.fillWidth: true
-                        text: "Aether does not currently load third-party extensions. This page will show plugin discovery and controls once extension support is available."
-                        color: Theme.subtext
-                        font.pointSize: Theme.fontSmall
-                        horizontalAlignment: Text.AlignHCenter
-                        wrapMode: Text.WordWrap
+            Repeater {
+                model: pluginManager
+                delegate: Rectangle {
+                    required property string pluginId
+                    required property string name
+                    required property string version
+                    required property string description
+                    required property string author
+                    required property bool enabled
+                    required property string error
+                    required property var actions
+                    required property var settings
+                    required property var permissions
+                    Layout.fillWidth: true
+                    implicitHeight: content.implicitHeight + 24
+                    radius: Theme.radiusMedium
+                    color: Theme.containerColor(Theme.surface, 0.22)
+                    border.width: 1
+                    border.color: root.sectionBorderColor
+                    ColumnLayout {
+                        id: content
+                        anchors.fill: parent
+                        anchors.margins: 12
+                        spacing: 8
+                        RowLayout {
+                            Layout.fillWidth: true
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 2
+                                Text { text: name; color: Theme.text; font.bold: true; font.pointSize: Theme.fontNormal }
+                                Text { text: [pluginId, version, author].filter(Boolean).join(" · "); color: Theme.subtext; font.pointSize: Theme.fontSmall }
+                            }
+                            Q.Toggle {
+                                checked: enabled
+                                enabled: !error
+                                label: "Enabled"
+                                onToggled: (value) => pluginManager.setEnabled(pluginId, value)
+                            }
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            visible: description.length > 0 || error.length > 0
+                            text: error.length ? error : description
+                            color: error.length ? Theme.error : Theme.subtext
+                            font.pointSize: Theme.fontSmall
+                            wrapMode: Text.WordWrap
+                        }
+                        Repeater {
+                            model: permissions
+                            delegate: Q.Toggle {
+                                required property var modelData
+                                label: "Allow: " + modelData.name
+                                checked: modelData.enabled
+                                onToggled: (value) => pluginManager.setPermission(pluginId, modelData.name, value)
+                            }
+                        }
+                        Repeater {
+                            model: enabled && !error ? actions : []
+                            delegate: Q.Button {
+                                required property int index
+                                required property string modelData
+                                text: modelData
+                                onClicked: pluginManager.triggerAction(pluginId, index)
+                            }
+                        }
+                        Repeater {
+                            model: settings
+                            delegate: Rectangle {
+                                required property var modelData
+                                Layout.fillWidth: true
+                                implicitHeight: sectionContent.implicitHeight + 20
+                                radius: Theme.radiusMedium
+                                color: Theme.containerColor(Theme.surface, 0.14)
+                                border.width: 1
+                                border.color: root.sectionBorderColor
+                                ColumnLayout {
+                                    id: sectionContent
+                                    anchors.fill: parent
+                                    anchors.margins: 10
+                                    spacing: 8
+                                    Text { text: modelData.title; color: Theme.text; font.bold: true; font.pointSize: Theme.fontNormal }
+                                    Text {
+                                        Layout.fillWidth: true
+                                        visible: modelData.description.length > 0
+                                        text: modelData.description
+                                        color: Theme.subtext
+                                        font.pointSize: Theme.fontSmall
+                                        wrapMode: Text.WordWrap
+                                    }
+                                    Repeater {
+                                        model: modelData.controls
+                                        delegate: Loader {
+                                            required property var modelData
+                                            Layout.fillWidth: true
+                                            property string ownerPluginId: pluginId
+                                            property var controlData: modelData
+                                            sourceComponent: controlData.type === "toggle" ? settingToggle
+                                                : controlData.type === "choice" ? settingChoice
+                                                : controlData.type === "number" ? settingNumber : settingText
+                                            function syncControl() {
+                                                if (item) {
+                                                    item.ownerPluginId = ownerPluginId
+                                                    item.controlData = controlData
+                                                }
+                                            }
+                                            onLoaded: syncControl()
+                                            onControlDataChanged: syncControl()
+                                            onOwnerPluginIdChanged: syncControl()
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
+            }
+
+            Component {
+                id: settingToggle
+                Q.Toggle {
+                    property string ownerPluginId: ""
+                    property var controlData: ({})
+                    label: controlData.label || controlData.key
+                    checked: controlData.value === true
+                    onToggled: (value) => pluginManager.setSetting(ownerPluginId, controlData.key, value)
+                }
+            }
+            Component {
+                id: settingText
+                ColumnLayout {
+                    property string ownerPluginId: ""
+                    property var controlData: ({})
+                    spacing: 4
+                    Text { text: controlData.label || controlData.key; color: Theme.text; font.pointSize: Theme.fontSmall }
+                    Q.TextField {
+                        text: String(controlData.value ?? "")
+                        placeholder: controlData.placeholder || ""
+                        onTextEdited: (value) => pluginManager.setSetting(parent.ownerPluginId, parent.controlData.key, value)
+                    }
+                }
+            }
+            Component {
+                id: settingNumber
+                ColumnLayout {
+                    property string ownerPluginId: ""
+                    property var controlData: ({})
+                    spacing: 4
+                    Text { text: controlData.label || controlData.key; color: Theme.text; font.pointSize: Theme.fontSmall }
+                    Q.TextField {
+                        text: String(controlData.value ?? "")
+                        placeholder: controlData.placeholder || "Number"
+                        onTextEdited: (value) => {
+                            const numberValue = Number(value)
+                            if (value !== "" && Number.isFinite(numberValue))
+                                pluginManager.setSetting(parent.ownerPluginId, parent.controlData.key, numberValue)
+                        }
+                    }
+                }
+            }
+            Component {
+                id: settingChoice
+                Q.Dropdown {
+                    property string ownerPluginId: ""
+                    property var controlData: ({})
+                    label: controlData.label || controlData.key
+                    model: controlData.options || []
+                    currentIndex: Math.max(0, model.indexOf(String(controlData.value ?? "")))
+                    onSelected: (index, value) => pluginManager.setSetting(ownerPluginId, controlData.key, value)
+                }
+            }
+
+            Text {
+                Layout.fillWidth: true
+                visible: pluginManager.count === 0
+                text: "No plugins installed yet. Each plugin belongs in its own folder and needs a plugin.json manifest and main.lua entry file."
+                color: Theme.subtext
+                font.pointSize: Theme.fontSmall
+                wrapMode: Text.WordWrap
             }
         }
     }

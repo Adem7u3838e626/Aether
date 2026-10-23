@@ -34,6 +34,7 @@
 #endif
 
 #include "services/configmanager.h"
+#include "services/pluginmanager.h"
 #include "services/themeloader.h"
 #include "services/fileoperations.h"
 #include "services/clipboardmanager.h"
@@ -952,6 +953,7 @@ int main(int argc, char *argv[])
                      metadataExtractor, &MetadataExtractor::refreshSupport);
 
     QQmlApplicationEngine engine;
+    auto *pluginManager = new PluginManager(fileOps, &app);
 
     // Aether and Quill are both compiled in. These paths only serve the
     // on-disk fallback copy of the Aether module (see below). No source-tree
@@ -1000,6 +1002,7 @@ int main(int argc, char *argv[])
     shared->setContextProperty("rcloneService", rcloneService);
     shared->setContextProperty("runtimeFeatures", runtimeFeatures);
     shared->setContextProperty("dependencies", dependencies);
+    shared->setContextProperty("pluginManager", pluginManager);
 
     // The main window, compiled once and instantiated per window. The qrc
     // module is qmlcachegen-compiled; the installed on-disk copy is only the

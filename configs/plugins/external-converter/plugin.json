@@ -1,0 +1,10 @@
+{
+  "id": "external-converter",
+  "name": "External file converter",
+  "version": "1.0.0",
+  "description": "Adds image, audio, and video conversion actions using external tools.",
+  "author": "Aether example",
+  "apiVersion": 1,
+  "permissions": ["process"],
+  "entry": "main.lua"
+}

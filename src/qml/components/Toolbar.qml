@@ -28,6 +28,7 @@ Rectangle {
     property string searchDateFilter: ""
     property string searchSizeFilter: ""
     property bool filterPanelOpen: false
+    property var pluginActions: []
     property alias searchBar: searchBarLoader.item
     property alias filterPanel: filterPanelLoader.item
 
@@ -82,6 +83,7 @@ Rectangle {
     signal minimizeRequested()
     signal maximizeRequested()
     signal transferRequested(var paths, string destinationPath, bool moveOperation)
+    signal pluginActionRequested(string pluginId, int actionIndex)
 
     // Parse "buttons_left:buttons_right" layout string
     readonly property var _parsedLayout: {
@@ -826,6 +828,31 @@ Rectangle {
                         orientation: Gradient.Horizontal
                         GradientStop { position: 0; color: "transparent" }
                         GradientStop { position: 1; color: Theme.mantle }
+                    }
+                }
+            }
+        }
+
+        RowLayout {
+            visible: root.pluginActions && root.pluginActions.length > 0
+            Layout.fillWidth: true
+            Layout.preferredHeight: visible ? 34 : 0
+            spacing: 4
+            Repeater {
+                model: root.pluginActions || []
+                delegate: HoverRect {
+                    required property var modelData
+                    Layout.preferredWidth: label.implicitWidth + 20
+                    Layout.preferredHeight: 28
+                    radius: Theme.radiusSmall
+                    color: hovered ? Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.1) : "transparent"
+                    onClicked: root.pluginActionRequested(modelData.pluginId, modelData.actionIndex)
+                    Text {
+                        id: label
+                        anchors.centerIn: parent
+                        text: modelData.label
+                        color: Theme.text
+                        font.pointSize: Theme.fontSmall
                     }
                 }
             }

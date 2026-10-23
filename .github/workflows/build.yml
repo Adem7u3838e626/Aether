@@ -102,6 +102,7 @@ jobs:
             ninja-build \
             libgl-dev \
             libxkbcommon-dev \
+            libxcb-cursor0 \
             libdbus-1-dev \
             libwayland-dev \
             libegl-dev \
@@ -250,6 +251,25 @@ jobs:
           ls AppDir/usr/plugins/wayland-graphics-integration-client/ || true
 
           scripts/prune-appdir.sh AppDir
+
+          # Qt's XCB platform plugin needs libxcb-cursor at runtime. Make
+          # sure it is bundled instead of relying on the user's system copy.
+          test -e AppDir/usr/lib/libxcb-cursor.so.0
+          ! ldd AppDir/usr/plugins/platforms/libqxcb.so | grep -q 'not found'
+
+          # Set Qt paths explicitly: the generated AppRun symlink does not
+          # resolve plugins reliably with every Qt build used for packaging.
+          rm -f AppDir/AppRun
+          cat > AppDir/AppRun <<'APP_RUN_EOF'
+          #!/bin/sh
+          APPDIR="${APPDIR:-$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)}"
+          export QT_PLUGIN_PATH="$APPDIR/usr/plugins"
+          export QT_QPA_PLATFORM_PLUGIN_PATH="$APPDIR/usr/plugins/platforms"
+          export QML2_IMPORT_PATH="$APPDIR/usr/qml"
+          export LD_LIBRARY_PATH="$APPDIR/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          exec "$APPDIR/usr/bin/aether" "$@"
+          APP_RUN_EOF
+          chmod +x AppDir/AppRun
 
           OUTPUT="Aether-${TAG_NAME}-x86_64.AppImage" \
           ./linuxdeploy-x86_64.AppImage \

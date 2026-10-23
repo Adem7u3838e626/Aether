@@ -153,21 +153,18 @@ The Vim navigation option is available in Settings → Layout. It adds `h/j/k/l`
 
 ## 🗺 Roadmap
 
-Aether is under active development. The next major goal is a plugin system that lets users extend the file manager while keeping the core focused and maintainable. The Plugins page currently shows a placeholder; Aether does **not** load third-party extensions yet.
-
-Planned work:
-
-- Define a documented extension API and its supported capabilities.
-- Add plugin discovery and basic management in Settings.
-- Provide a small example plugin and guidance for plugin authors.
-- Continue improving cloud storage, keyboard navigation, and the everyday file management experience alongside that work.
-
-These are project goals, not release promises or a fixed schedule. The plugin design preview below shows the current placeholder page, not a working plugin manager.
+Aether now has an initial Lua plugin system. The Settings → Plugins page discovers
+plugins from the user's config directory and supports enabling or disabling them.
+Enabled plugins can add buttons to their plugin card and matching file context
+menus. See
+[the plugin author guide](docs/plugins.md) for the manifest format, install path,
+and current extension limits. Plugins execute code with Aether's permissions
+and are not sandboxed.
 
 <div align="center">
 
 ![Plugins page design preview](docs/screenshots/pluguinmanager-bita.png)
-*Current Plugins settings placeholder; extension support is planned*
+*Plugins settings page design preview*
 
 </div>
 
@@ -246,16 +243,10 @@ cd aether
 cmake -B build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DBUILD_TESTS=OFF
-cmake --build build --parallel
-./build/src/aether
-```
-
-To install a user-local `aether` command and add **Aether** to your desktop
-app launcher, run:
-
-```bash
 cmake --install build --prefix "$HOME/.local"
+cmake --build build --parallel
 ```
+
 
 The installed launcher entry is named Aether; the terminal command is
 `aether`. Make sure `$HOME/.local/bin` is on your `PATH` to run it by name.
@@ -270,14 +261,14 @@ To build a self-contained AppImage from the current checkout, useful for testing
 ./scripts/build-appimage-local.sh
 ```
 
-The result lands in the repo root as `Aether-<version>-x86_64.AppImage`. The script downloads `linuxdeploy` into `appimage-tools/` on first run, bundles Qt, and runs an offscreen smoke test before finishing. It needs `curl` or `wget` on top of the build dependencies below.
+The result lands in the repo root as `Aether-<version>-x86_64.AppImage`. The script downloads `linuxdeploy` into `appimage-tools/` on first run, bundles Qt and the XCB cursor library, and runs an offscreen smoke test before finishing. It needs `curl` or `wget` on top of the build dependencies below; on Arch, install `xcb-util-cursor` before packaging.
 
 #### Dependencies
 
 | | Packages |
 |---|---|
-| **Required (build)** | `cmake`, `ninja`, `qt6-base`, `qt6-declarative`, `qt6-svg` |
-| **Required (runtime)** | `qt6-base`, `qt6-declarative`, `qt6-svg`, `qt6-wayland`, `glib2`, `xdg-utils` |
+| **Required (build)** | `cmake`, `ninja`, `qt6-base`, `qt6-declarative`, `qt6-svg`, Lua 5.4 development package |
+| **Required (runtime)** | `qt6-base`, `qt6-declarative`, `qt6-svg`, `qt6-wayland`, Lua 5.4, `glib2`, `xdg-utils` |
 | **Archives** | `tar`, `gzip`, `bzip2`, `xz`, `zstd`, `zip`, `unzip`, `p7zip` (`7z`), `libarchive` (`bsdtar`). Compress and extract call these by name, so a missing one only breaks that format. |
 | **Optional** | `kwindowsystem` / `KF6WindowSystem` (native KDE blur), `wl-clipboard` (clipboard on Wayland), `fd` (fast search), `bat` (syntax highlighting), `md4c` (rendered Markdown previews via `md2html`; see the note below), `git` (git status overlays), `gvfs` (SFTP/SMB/MTP; not needed for the trash), `gvfs-smb` (SMB), `gvfs-mtp` (Android/MTP phones), `rclone` (cloud drives), `ffmpeg` (video thumbnails), `exiftool` (metadata sidebar), `udisks2` (device mounting), `poppler` / `poppler-utils` (PDF previews via `pdftoppm`) |
 

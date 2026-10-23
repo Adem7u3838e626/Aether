@@ -1,0 +1,9 @@
+{
+  "id": "hello-panel",
+  "name": "Hello panel",
+  "version": "1.0.0",
+  "description": "A small Lua example that logs when enabled and adds an action button.",
+  "author": "Aether example",
+  "apiVersion": 1,
+  "entry": "main.lua"
+}

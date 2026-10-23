@@ -20,6 +20,7 @@ Item {
     property var selectedFolderPaths: []
     property var customItems: []
     property var contextData: ({})
+    property string pluginContextType: "file"
     property int menuWidth: 260
     property bool splitViewEnabled: false
     property bool isTrashView: false
@@ -647,7 +648,9 @@ Item {
     function buildModel() {
         var items = []
         if (hasCustomItems) {
-            return customItems
+            var sidebarPlugins = pluginManager.contextMenuItems(pluginContextType, targetPath,
+                targetIsDir, effectivePaths, contextData)
+            return sidebarPlugins.length ? customItems.concat([{ separator: true }], sidebarPlugins) : customItems
         }
         if (selectedFolderPaths.length === 2
                 && !isTrashView
@@ -693,6 +696,12 @@ Item {
                 if (custom.length > 0) {
                     items.push({ separator: true })
                     items = items.concat(custom)
+                }
+                var pluginMenus = pluginManager.contextMenuItems(targetIsDir ? "directory" : "file",
+                    targetPath, targetIsDir, effectivePaths, contextData)
+                if (pluginMenus.length > 0) {
+                    items.push({ separator: true })
+                    items = items.concat(pluginMenus)
                 }
             }
             items.push({ separator: true })
@@ -743,6 +752,11 @@ Item {
             items.push({ separator: true })
             items.push({ text: "Properties", shortcut: "", action: "properties", icon: "Info" })
         } else {
+                var emptyPlugins = pluginManager.contextMenuItems("empty", targetPath, true, [], contextData)
+                if (emptyPlugins.length) {
+                    items.push({ separator: true })
+                    items = items.concat(emptyPlugins)
+                }
             items.push({ text: "Select All", shortcut: "Ctrl+A", action: "selectall", icon: "Check" })
             items.push({ separator: true })
             items.push({ text: "View", shortcut: "", action: "view_toggle", isSubmenu: true, icon: "Eye",
@@ -852,7 +866,16 @@ Item {
         case "emptytrash": emptyTrashRequested(); break
         case "save_split": saveSplitRequested(selectedFolderPaths); break
         default:
-            if (action.startsWith("custom:")) {
+            if (action.startsWith("pluginctx:")) {
+                pluginManager.triggerContextAction(parseInt(action.slice(10)), {
+                    path: targetPath,
+                    paths: isEmptySpace ? [] : effectivePaths,
+                    isDirectory: targetIsDir,
+                    contextType: pluginContextType,
+                    context: contextData,
+                    isEmptySpace: isEmptySpace
+                })
+            } else if (action.startsWith("custom:")) {
                 var custom = config.customContextActions[parseInt(action.slice(7))]
                 if (custom && custom.command)
                     customActionRunRequested(custom.name || "", custom.command, effectivePaths)

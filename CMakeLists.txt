@@ -3,6 +3,7 @@ project(aether VERSION 0.6.1 LANGUAGES CXX)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GIO REQUIRED IMPORTED_TARGET gio-2.0 gio-unix-2.0)
+pkg_check_modules(LUA REQUIRED IMPORTED_TARGET lua5.4)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

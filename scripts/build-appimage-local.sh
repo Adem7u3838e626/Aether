@@ -194,6 +194,32 @@ done
 
 "$ROOT_DIR/scripts/prune-appdir.sh" "$APPDIR"
 
+# The AppImage runtime's default AppRun symlink does not set Qt's plugin paths
+# for every host Qt build. Point Qt at the plugins and QML modules bundled in
+# this AppDir so platform plugins such as Wayland and XCB are found reliably.
+rm -f "$APPDIR/AppRun"
+cat > "$APPDIR/AppRun" <<'APP_RUN_EOF'
+#!/bin/sh
+APPDIR="${APPDIR:-$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)}"
+export QT_PLUGIN_PATH="$APPDIR/usr/plugins"
+export QT_QPA_PLATFORM_PLUGIN_PATH="$APPDIR/usr/plugins/platforms"
+export QML2_IMPORT_PATH="$APPDIR/usr/qml"
+export LD_LIBRARY_PATH="$APPDIR/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+exec "$APPDIR/usr/bin/aether" "$@"
+APP_RUN_EOF
+chmod +x "$APPDIR/AppRun"
+
+if [[ ! -e "$APPDIR/usr/lib/libxcb-cursor.so.0" ]]; then
+    printf 'Missing bundled libxcb-cursor.so.0; install xcb-util-cursor before building the AppImage.\n' >&2
+    exit 1
+fi
+
+if ldd "$APPDIR/usr/plugins/platforms/libqxcb.so" | rg -q 'not found'; then
+    printf 'The bundled Qt XCB platform plugin has unresolved libraries.\n' >&2
+    ldd "$APPDIR/usr/plugins/platforms/libqxcb.so" >&2
+    exit 1
+fi
+
 "$LINUXDEPLOY" \
     --appdir "$APPDIR" \
     "${deploy_deps_args[@]}" \
@@ -202,7 +228,7 @@ done
 if [[ "$SMOKE_TEST" == "1" ]]; then
     set +e
     QT_QPA_PLATFORM=offscreen QSG_RHI_BACKEND=software \
-        timeout 10 "$ROOT_DIR/$APPIMAGE_NAME" \
+        timeout 10 "$APPDIR/AppRun" \
         > "$ROOT_DIR/appimage-smoke.stdout" \
         2> "$ROOT_DIR/appimage-smoke.stderr"
     smoke_status=$?

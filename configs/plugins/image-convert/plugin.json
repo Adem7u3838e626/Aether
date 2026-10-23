@@ -1,0 +1,8 @@
+{
+  "id": "image-convert",
+  "name": "Image converter",
+  "version": "1.0.0",
+  "description": "Adds a Convert into submenu to image file context menus.",
+  "author": "Aether example",
+  "entry": "main.lua"
+}

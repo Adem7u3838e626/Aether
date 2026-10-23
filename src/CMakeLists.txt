@@ -1,6 +1,7 @@
 set(AETHER_SOURCES
     main.cpp
     services/configmanager.cpp
+    services/pluginmanager.cpp
     services/themeloader.cpp
     services/clipboardmanager.cpp
     services/fileoperations.cpp
@@ -83,6 +84,10 @@ set(aether_qml_module_args
     URI Aether
     VERSION 1.0
     RESOURCE_PREFIX /
+    # linuxdeploy-plugin-qt performs the QML import scan used for AppImages.
+    # Qt's link scanner also walks the source directory and mistakes Quill's
+    # adjacent, unused Quickshell showcase for an Aether dependency.
+    NO_IMPORT_SCAN
 )
 
 if(NOT AETHER_ENABLE_QML_CACHEGEN)
@@ -202,11 +207,6 @@ set(quill_qml_module_args
     VERSION 1.0
     RESOURCE_PREFIX /qt/qml
     OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Quill
-    # Quill ships a standalone Quickshell showcase beside its reusable
-    # components. It is not part of this module or Aether's runtime, so do
-    # not let Qt's static-plugin scanner treat that developer tool as a
-    # dependency of the file manager.
-    NO_IMPORT_SCAN
 )
 if(NOT AETHER_ENABLE_QML_CACHEGEN)
     list(APPEND quill_qml_module_args NO_CACHEGEN)
@@ -252,6 +252,7 @@ target_link_libraries(aether PRIVATE
     Qt6::Network
     Qt6::Concurrent
     PkgConfig::GIO
+    PkgConfig::LUA
 )
 
 if(KF6WindowSystem_FOUND)

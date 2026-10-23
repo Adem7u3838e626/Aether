@@ -156,6 +156,7 @@ ApplicationWindow {
             root.applyFolderSort(tabModel.activeTab.currentPath)
             root.applyActiveTabSort()
         }
+        pluginManager.dispatchEvent("app.started", { path: tabModel.activeTab ? tabModel.activeTab.currentPath : "" })
 
         // Bridge Aether theme into Quill theme singleton
         Q.Theme.background = Qt.binding(() => Theme.base)
@@ -672,8 +673,18 @@ ApplicationWindow {
                 tabModel.activeTab.navigateSecondaryTo(path)
             else
                 tabModel.activeTab.navigateTo(path)
+            pluginManager.dispatchEvent("folder.opened", { path: path, pane: pane })
             root.scheduleActivePaneFocus()
         })
+    }
+
+    Instantiator {
+        model: pluginManager.shortcuts
+        delegate: Shortcut {
+            required property var modelData
+            sequence: modelData.shortcut
+            onActivated: pluginManager.triggerAction(modelData.pluginId, modelData.actionIndex)
+        }
     }
 
     function navigateActivePaneTo(path) {
@@ -687,8 +698,10 @@ ApplicationWindow {
         ensureMountedAndRun(path, function() {
             root.setPaneRecents(root.activePane, false)
             tabModel.addTab()
-            if (tabModel.activeTab)
+            if (tabModel.activeTab) {
                 tabModel.activeTab.navigateTo(path)
+                pluginManager.dispatchEvent("folder.opened", { path: path, pane: "primary" })
+            }
             root.scheduleActivePaneFocus()
         })
     }
@@ -985,6 +998,8 @@ ApplicationWindow {
         tab.splitOrientation = (split.orientation || config.splitOrientation || "vertical").toLowerCase()
         tab.navigateTo(split.primaryPath)
         tab.resetSecondaryTo(split.secondaryPath)
+        pluginManager.dispatchEvent("folder.opened", { path: split.primaryPath, pane: "primary" })
+        pluginManager.dispatchEvent("folder.opened", { path: split.secondaryPath, pane: "secondary" })
         root.updateSelectionStatus()
     }
 
@@ -3978,6 +3993,10 @@ ApplicationWindow {
         menu.targetPath = filePath !== "" ? filePath : currentDir
         menu.targetIsDir = filePath !== "" ? isDirectory : true
         menu.isEmptySpace = (filePath === "")
+        menu.pluginContextType = filePath === "" ? "empty" : (isDirectory ? "directory" : "file")
+        menu.contextData = { currentPath: currentDir, pane: pane,
+                             viewMode: tabModel.activeTab ? tabModel.activeTab.viewMode : "grid",
+                             isTrashView: fileOps.isTrashPath(currentDir) }
         var sel = getSelectedPaths(pane)
         menu.selectedPaths = (sel.length > 1) ? sel : (filePath !== "" ? [filePath] : [])
         var selectedItems = getSelectedItems(pane)
@@ -4068,7 +4087,8 @@ ApplicationWindow {
                         sidebarContextMenuLoader.active = true
                         const menu = root.sidebarContextMenu
                         menu.sidebarItem = item
-                        menu.contextData = item
+                        menu.contextData = Object.assign({}, item, { kind: item.kind || "unknown" })
+                        menu.pluginContextType = "sidebar"
                         menu.customItems = root.sidebarMenuItems(item)
                         menu.targetPath = item.path || ""
                         menu.targetIsDir = !!item.path
@@ -4167,6 +4187,8 @@ ApplicationWindow {
                 sidebarOnRight: config.sidebarPosition === "right"
                 showWindowControls: root.useIntegratedWindowControls
                 windowButtonLayout: config.windowButtonLayout
+                pluginActions: pluginManager.toolbarActions
+                onPluginActionRequested: (pluginId, actionIndex) => pluginManager.triggerAction(pluginId, actionIndex)
                 currentSearchQuery: root.searchProxyForPane(activePane).searchQuery
                 searchTypeFilter: root.searchProxyForPane(activePane).fileTypeFilter
                 searchDateFilter: root.searchProxyForPane(activePane).dateFilter
@@ -4326,6 +4348,7 @@ ApplicationWindow {
                                 onSelectionChanged: {
                                     root.setActivePane("primary")
                                     root.updateSelectionStatus()
+                                    pluginManager.dispatchEvent("files.selected", { pane: "primary", paths: root.getSelectedPaths("primary") })
                                 }
                                 onTransferRequested: (paths, destinationPath, moveOperation) => {
                                     root.setActivePane("primary")
@@ -4416,6 +4439,7 @@ ApplicationWindow {
                                     onSelectionChanged: {
                                         root.setActivePane("secondary")
                                         root.updateSelectionStatus()
+                                        pluginManager.dispatchEvent("files.selected", { pane: "secondary", paths: root.getSelectedPaths("secondary") })
                                     }
                                     onTransferRequested: (paths, destinationPath, moveOperation) => {
                                         root.setActivePane("secondary")
