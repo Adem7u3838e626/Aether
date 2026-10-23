@@ -17,12 +17,24 @@ FocusScope {
     property var selectedIndices: currentColumn.selectedIndices
     property int lastSelectedIndex: currentColumn.lastSelectedIndex
     property int cursorIndex: currentColumn.cursorIndex
+    property bool vimVisualMode: false
 
     signal fileActivated(string filePath, bool isDirectory)
     signal contextMenuRequested(string filePath, bool isDirectory, point position)
     signal selectionChanged()
     signal interactionStarted()
     signal transferRequested(var paths, string destinationPath, bool moveOperation)
+
+    function toggleVimVisualMode() {
+        if (vimVisualMode) {
+            vimVisualMode = false
+            return
+        }
+        var anchor = currentColumn.cursorIndex >= 0 ? currentColumn.cursorIndex
+            : (currentColumn.selectedIndices.length > 0 ? currentColumn.selectedIndices[currentColumn.selectedIndices.length - 1] : 0)
+        currentColumn.moveSelectionTo(anchor, false)
+        vimVisualMode = true
+    }
 
     function dropPaths(drop) {
         if (dragHelper.active && dragHelper.activePaths.length > 0)
@@ -149,6 +161,7 @@ FocusScope {
     }
 
     onCurrentPathChanged: {
+        vimVisualMode = false
         syncParentModel()
         // See FileGridView/FileDetailedView: reset sticky drag state so
         // wheel scrolling works immediately after navigation without the
@@ -440,6 +453,12 @@ FocusScope {
             boundsBehavior: Flickable.StopAtBounds
             boundsMovement: Flickable.StopAtBounds
             keyNavigationEnabled: false
+            property bool vimGoPending: false
+            Timer {
+                id: vimGoTimer
+                interval: 650
+                onTriggered: currentColumn.vimGoPending = false
+            }
             add: Transition {
                 ParallelAnimation {
                     NumberAnimation {
@@ -789,9 +808,29 @@ FocusScope {
                 event.accepted = true
             }
             Keys.onPressed: (event) => {
+                if (config.vimNavigation && event.key === Qt.Key_G) {
+                    if (event.modifiers & Qt.ShiftModifier) {
+                        vimGoPending = false
+                        vimGoTimer.stop()
+                        moveSelectionTo(count - 1, root.vimVisualMode)
+                    } else if (vimGoPending) {
+                        vimGoPending = false
+                        vimGoTimer.stop()
+                        moveSelectionTo(0, root.vimVisualMode)
+                    } else {
+                        vimGoPending = true
+                        vimGoTimer.restart()
+                    }
+                    event.accepted = true
+                    return
+                }
+                if (vimGoPending) {
+                    vimGoPending = false
+                    vimGoTimer.stop()
+                }
                 if (config.vimNavigation
                         && (event.modifiers === Qt.NoModifier || event.modifiers === Qt.ShiftModifier)) {
-                    var extendSelection = (event.modifiers & Qt.ShiftModifier) !== 0
+                    var extendSelection = (event.modifiers & Qt.ShiftModifier) !== 0 || root.vimVisualMode
                     if (event.key === Qt.Key_H) {
                         root.goUp()
                         event.accepted = true

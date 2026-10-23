@@ -17,6 +17,19 @@ Rectangle {
     }
     property bool isRecentsView: false
     property Item tooltipLayer: null
+    signal returnToFilesRequested()
+    focus: false
+    border.width: activeFocus ? 1 : 0
+    border.color: Theme.accent
+
+    function focusForKeyboard() {
+        forceActiveFocus()
+    }
+
+    Keys.onEscapePressed: (event) => {
+        returnToFilesRequested()
+        event.accepted = true
+    }
     signal bookmarkClicked(string path)
     signal savedSplitClicked(var split)
 
@@ -30,7 +43,6 @@ Rectangle {
     signal recentsClicked()
     signal collapseClicked()
     signal featureHintRequested(string message)
-    signal cloudDriveConnectRequested()
 
     color: Theme.mantle
     clip: false
@@ -966,15 +978,19 @@ Rectangle {
             }
         }
 
-        // Keep active transfer status above the anchored footer sections.
-        OperationsBar {
-            Layout.fillWidth: true
-        }
-
-        // Spacer pushes the cloud and account sections down.
+        // Spacer keeps the cloud and account sections anchored at the bottom.
         Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
+        }
+
+        // Active transfers sit at the bottom of the sidebar, just above clouds.
+        OperationsBar {
+            Layout.fillWidth: true
+            Layout.leftMargin: Theme.spacing
+            Layout.rightMargin: Theme.spacing
+            Layout.topMargin: 4
+            Layout.bottomMargin: 6
         }
 
         // Keep cloud drives in their own bottom section, separate from the
@@ -1007,20 +1023,13 @@ Rectangle {
                 }
 
                 Item { Layout.fillWidth: true }
-
-                HoverRect {
-                    width: 24
-                    height: 24
-                    Accessible.name: "Add cloud drive"
-                    onClicked: root.cloudDriveConnectRequested()
-                    IconPlus { anchors.centerIn: parent; size: 14; color: Theme.subtext }
-                }
             }
 
             Repeater {
                 model: rcloneService.remoteNames
 
                 delegate: Rectangle {
+                    id: cloudRemoteDelegate
                     required property string modelData
                     Layout.fillWidth: true
                     Layout.leftMargin: Theme.spacing / 2
@@ -1037,7 +1046,7 @@ Rectangle {
                     Row {
                         anchors.fill: parent
                         anchors.leftMargin: Theme.spacing
-                        anchors.rightMargin: Theme.spacing
+                        anchors.rightMargin: Theme.spacing + 28
                         spacing: Theme.spacing
 
                         IconCloud {
@@ -1048,7 +1057,7 @@ Rectangle {
 
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
-                            text: parent.parent.modelData
+                            text: cloudRemoteDelegate.modelData
                             color: parent.parent.mounted ? Theme.accent : Theme.text
                             font.pointSize: Theme.fontNormal
                             elide: Text.ElideRight
@@ -1077,49 +1086,34 @@ Rectangle {
                             }
                         }
                     }
+
+                    HoverRect {
+                        anchors.right: parent.right
+                        anchors.rightMargin: 3
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 26
+                        height: 26
+                        Accessible.name: "More options for " + cloudRemoteDelegate.modelData
+                        onClicked: {
+                            const point = mapToItem(null, width / 2, height / 2)
+                            root.sidebarContextMenuRequested({
+                                kind: "cloudRemote",
+                                name: cloudRemoteDelegate.modelData,
+                                remoteName: cloudRemoteDelegate.modelData,
+                                path: rcloneService.getMountPath(cloudRemoteDelegate.modelData)
+                            }, Qt.point(point.x, point.y))
+                        }
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "⋮"
+                            color: Theme.subtext
+                            font.pointSize: 18
+                        }
+                    }
                 }
             }
 
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.leftMargin: Theme.spacing / 2
-                Layout.rightMargin: Theme.spacing / 2
-                height: 32
-                radius: Theme.radiusSmall
-                color: addCloudDriveHover.containsMouse
-                    ? Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.07)
-                    : "transparent"
-
-                Row {
-                    anchors.fill: parent
-                    anchors.leftMargin: Theme.spacing
-                    anchors.rightMargin: Theme.spacing
-                    spacing: Theme.spacing
-
-                    IconCloud {
-                        anchors.verticalCenter: parent.verticalCenter
-                        size: 18
-                        color: Theme.subtext
-                    }
-
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "Add a cloud drive"
-                        color: Theme.text
-                        font.pointSize: Theme.fontNormal
-                        elide: Text.ElideRight
-                        width: parent.width - 26 - Theme.spacing
-                    }
-                }
-
-                MouseArea {
-                    id: addCloudDriveHover
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.cloudDriveConnectRequested()
-                }
-            }
         }
 
         Rectangle {

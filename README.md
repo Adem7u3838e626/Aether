@@ -192,7 +192,7 @@ local `type: dir` source. Run:
 ```bash
 flatpak remote-add --user --if-not-exists flathub \
     https://dl.flathub.org/repo/flathub.flatpakrepo
-flatpak install --user flathub org.kde.Platform//6.9 org.kde.Sdk//6.9
+flatpak install --user flathub org.kde.Platform//6.11 org.kde.Sdk//6.11
 flatpak-builder --force-clean --user --install build-flatpak \
     io.github.adem7u3838e626.Aether.yml
 flatpak run io.github.adem7u3838e626.Aether

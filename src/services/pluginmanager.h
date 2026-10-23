@@ -10,6 +10,7 @@
 
 struct lua_State;
 class FileOperations;
+class QProcess;
 
 class PluginManager : public QAbstractListModel
 {
@@ -18,6 +19,8 @@ class PluginManager : public QAbstractListModel
     Q_PROPERTY(int count READ rowCount NOTIFY countChanged)
     Q_PROPERTY(QVariantList toolbarActions READ toolbarActions NOTIFY actionsChanged)
     Q_PROPERTY(QVariantList shortcuts READ shortcuts NOTIFY actionsChanged)
+    Q_PROPERTY(bool installingRepository READ installingRepository NOTIFY repositoryInstallChanged)
+    Q_PROPERTY(QString repositoryInstallStatus READ repositoryInstallStatus NOTIFY repositoryInstallChanged)
 
 public:
     struct ContextAction { QString label; QString icon; int callbackRef = -2; int route = -1; };
@@ -40,6 +43,9 @@ public:
     QVariant data(const QModelIndex &index, int role) const override;
     QHash<int, QByteArray> roleNames() const override;
     QString pluginDirectory() const;
+    bool installingRepository() const;
+    QString repositoryInstallStatus() const;
+    Q_INVOKABLE bool installFromRepository(const QString &url);
     Q_INVOKABLE bool setEnabled(const QString &id, bool enabled);
     Q_INVOKABLE void refresh();
     Q_INVOKABLE void triggerAction(const QString &id, int actionIndex);
@@ -72,6 +78,7 @@ public:
 signals:
     void countChanged();
     void actionsChanged();
+    void repositoryInstallChanged();
 
 private:
     struct Plugin { QString id, name, version, description, author, entry, error; QStringList permissions; int apiVersion = 1; bool enabled = false; QVariantList actions; QVariantList settings; QVariantList toolbarActions; QVariantList shortcuts; QVector<ContextMenuContribution> contextMenus; };
@@ -88,6 +95,10 @@ private:
     QJsonObject m_settingValues;
     QJsonObject m_permissionValues;
     FileOperations *m_fileOperations = nullptr;
+    QProcess *m_repositoryProcess = nullptr;
+    QString m_repositoryStagingPath;
+    QString m_repositoryInstallStatus;
     bool startPlugin(int row);
     void stopPlugin(const QString &id);
+    void finishRepositoryInstall(bool success, const QString &message);
 };

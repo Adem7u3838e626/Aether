@@ -1,7 +1,12 @@
 build/
+build-local-appimage/
+AppDir-local/
+appimage-tools/
+*.AppImage
 result
 .cache/
 .superpowers/
+src/models/.impeccable/hook.cache.json
 CMakeLists.txt.user
 *.o
 *.so

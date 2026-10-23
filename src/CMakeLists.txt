@@ -281,5 +281,8 @@ install(FILES "${CMAKE_SOURCE_DIR}/dist/io.github.adem7u3838e626.Aether.desktop"
     DESTINATION share/applications)
 install(FILES "${CMAKE_SOURCE_DIR}/dist/io.github.adem7u3838e626.Aether.svg"
     DESTINATION share/icons/hicolor/scalable/apps)
+install(DIRECTORY "${CMAKE_SOURCE_DIR}/dist/icons/hicolor/"
+    DESTINATION share/icons/hicolor
+    FILES_MATCHING PATTERN "*.png")
 install(FILES "${CMAKE_SOURCE_DIR}/dist/io.github.adem7u3838e626.Aether.metainfo.xml"
     DESTINATION share/metainfo)

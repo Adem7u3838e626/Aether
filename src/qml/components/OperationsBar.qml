@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
 import Aether
-import Quill as Q
 
 Rectangle {
     id: root
@@ -9,6 +8,22 @@ Rectangle {
     Accessible.name: "File operations"
 
     property bool _showBar: false
+    property bool _expanded: false
+
+    function compactTitle() {
+        if (transfersModel.count === 0)
+            return fileOps.busy ? fileOps.statusText : "Done"
+        if (transfersModel.count > 1)
+            return fileOps.statusText || (transfersModel.count + " transfers")
+
+        if (fileOps.paused)
+            return "Paused · " + (fileOps.currentFile || fileOps.statusText)
+        return fileOps.currentFile || fileOps.statusText || "Working…"
+    }
+
+    function compactProgress() {
+        return fileOps.progress
+    }
 
     function transferIndexById(transferId) {
         for (var i = 0; i < transfersModel.count; ++i) {
@@ -69,16 +84,24 @@ Rectangle {
         }
     }
 
-    visible: _showBar
+    visible: _showBar || opacity > 0.01
+    opacity: _showBar ? 1 : 0
     implicitHeight: _showBar ? contentCol.implicitHeight + 2 * Theme.spacing : 0
-    color: Theme.crust
+    radius: Math.min(Theme.radiusSmall, 5)
+    color: Theme.containerColor(Theme.mantle, 0.96)
+    border.width: 1
+    border.color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.09)
+
+    Behavior on opacity {
+        NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+    }
 
     ListModel {
         id: transfersModel
     }
 
     Behavior on implicitHeight {
-        NumberAnimation { duration: 150; easing.type: Theme.animEasingEnter; easing.bezierCurve: Theme.animBezierCurve }
+        NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
     }
 
     Timer {
@@ -93,6 +116,7 @@ Rectangle {
             if (fileOps.busy) {
                 hideTimer.stop()
                 root._showBar = true
+                root._expanded = config.expandTransfersByDefault
             } else {
                 hideTimer.restart()
             }
@@ -114,12 +138,106 @@ Rectangle {
         anchors.margins: Theme.spacing
         spacing: 8
 
+        RowLayout {
+            id: transferHeader
+            Layout.fillWidth: true
+            spacing: 6
+
+            Text {
+                Layout.fillWidth: true
+                text: root._expanded ? "FILE TRANSFERS" : root.compactTitle()
+                color: root._expanded ? Theme.muted : Theme.text
+                font.pointSize: Theme.fontSmall
+                font.bold: !root._expanded
+                font.letterSpacing: root._expanded ? 0.7 : 0
+                elide: Text.ElideMiddle
+            }
+
+            Rectangle {
+                implicitWidth: transferCount.implicitWidth + 12
+                implicitHeight: 20
+                radius: 10
+                color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.15)
+                visible: root._expanded
+
+                Text {
+                    id: transferCount
+                    anchors.centerIn: parent
+                    text: transfersModel.count
+                    color: Theme.accent
+                    font.pointSize: Theme.fontSmall
+                    font.bold: true
+                }
+            }
+
+            TapHandler {
+                onTapped: root._expanded = !root._expanded
+            }
+            HoverHandler { cursorShape: Qt.PointingHandCursor }
+        }
+
+        Rectangle {
+            visible: !root._expanded
+            Layout.fillWidth: true
+            Layout.leftMargin: 2
+            Layout.rightMargin: 2
+            implicitHeight: 4
+            radius: 2
+            color: Theme.surface
+            clip: true
+
+            Rectangle {
+                id: compactProgressFill
+                x: root.compactProgress() < 0 ? -width : 0
+                width: root.compactProgress() < 0 ? parent.width * 0.3
+                    : parent.width * Math.max(0, Math.min(1, root.compactProgress()))
+                height: parent.height
+                radius: parent.radius
+                color: Theme.accent
+
+                Behavior on width {
+                    NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+                }
+
+                SequentialAnimation on x {
+                    running: !root._expanded && root.compactProgress() < 0
+                    loops: Animation.Infinite
+                    NumberAnimation {
+                        from: -compactProgressFill.width
+                        to: compactProgressFill.parent.width
+                        duration: 1200
+                        easing.type: Easing.InOutCubic
+                    }
+                }
+            }
+
+            TapHandler {
+                onTapped: root._expanded = true
+            }
+            HoverHandler { cursorShape: Qt.PointingHandCursor }
+        }
+
         Repeater {
             model: transfersModel
 
             delegate: ColumnLayout {
+                visible: root._expanded
                 Layout.fillWidth: true
+                Layout.leftMargin: 2
+                Layout.rightMargin: 2
+                Layout.topMargin: 1
+                Layout.bottomMargin: 1
                 spacing: 4
+
+                Rectangle {
+                    z: -1
+                    anchors.fill: parent
+                    anchors.margins: -6
+                    radius: Math.min(Theme.radiusSmall, 4)
+                    color: Theme.containerColor(Theme.surface, 0.55)
+                    border.width: 1
+                    border.color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.06)
+                }
 
                 required property int transferId
                 required property string statusText
@@ -156,11 +274,37 @@ Rectangle {
                     Layout.fillWidth: true
                     spacing: 6
 
-                    Q.ProgressBar {
+                    Rectangle {
                         Layout.fillWidth: true
-                        value: progress <= 0 ? 0 : progress
-                        indeterminate: progress < 0
-                        monotonic: true
+                        implicitHeight: 6
+                        radius: 3
+                        color: Theme.surface
+                        clip: true
+
+                        Rectangle {
+                            id: progressFill
+                            x: progress < 0 ? -width : 0
+                            width: progress < 0 ? parent.width * 0.3
+                                                : parent.width * Math.max(0, Math.min(1, progress))
+                            height: parent.height
+                            radius: parent.radius
+                            color: Theme.accent
+
+                            Behavior on width {
+                                NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+                            }
+
+                            SequentialAnimation on x {
+                                running: progress < 0
+                                loops: Animation.Infinite
+                                NumberAnimation {
+                                    from: -progressFill.width
+                                    to: progressFill.parent.width
+                                    duration: 1200
+                                    easing.type: Easing.InOutCubic
+                                }
+                            }
+                        }
                     }
 
                     Text {
@@ -235,7 +379,7 @@ Rectangle {
 
         // "Done" state when no active transfers but bar still lingering
         Text {
-            visible: !fileOps.busy
+            visible: !fileOps.busy && root._expanded
             text: "Done"
             color: Theme.subtext
             font.pointSize: Theme.fontSmall

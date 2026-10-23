@@ -208,6 +208,7 @@ ApplicationWindow {
     // ── Sidebar visibility (local property; config.sidebarVisible is read-only) ─
     property bool sidebarVisible: config.sidebarVisible
     property int sidebarWidth: config.sidebarWidth
+    property bool zenMode: false
 
     // Below sidebar_auto_hide_width the sidebar folds away by itself, and comes
     // back when the window grows again - unless the user has since decided for
@@ -1548,6 +1549,7 @@ ApplicationWindow {
                 currentSidebarVisible: root.sidebarVisible
                 currentSidebarWidth: root.sidebarWidth
                 onRemoteConnectRequested: root.openRemoteConnectDialog()
+                onCloudDriveConnectRequested: root.openCloudDriveDialog()
                 onKeyboardShortcutsRequested: root.openKeyboardShortcutsDialog()
                 onDependenciesRequested: root.openMissingDependenciesDialog()
                 onClosed: root.scheduleActivePaneFocus()
@@ -3620,6 +3622,147 @@ ApplicationWindow {
     }
 
     // File operations
+    // Optional Vim-style commands share the same application actions as the
+    // normal shortcuts, so trash confirmation and clipboard behavior stay
+    // consistent across input methods.
+    Shortcut {
+        sequence: "/"
+        enabled: config.vimNavigation && !root.searchMode
+                 && !(root.settingsPanel && root.settingsPanel.visible)
+        onActivated: root.openSearch()
+    }
+
+    Shortcut {
+        sequence: "o"
+        enabled: config.vimNavigation && !root.searchMode
+                 && !(root.settingsPanel && root.settingsPanel.visible)
+        onActivated: {
+            var view = root.activeFileView()
+            var subView = root.subViewFor(view)
+            if (subView && subView.activateCurrentSelection)
+                subView.activateCurrentSelection()
+        }
+    }
+
+    Shortcut {
+        sequence: "v"
+        enabled: config.vimNavigation && !root.searchMode
+                 && !(root.settingsPanel && root.settingsPanel.visible)
+        onActivated: {
+            var subView = root.activeSubView()
+            if (subView && subView.toggleVimVisualMode)
+                subView.toggleVimVisualMode()
+        }
+    }
+
+    Shortcut {
+        sequence: "d,d"
+        enabled: config.vimNavigation && !root.searchMode
+                 && !(root.settingsPanel && root.settingsPanel.visible)
+        onActivated: {
+            var paths = root.getSelectedPaths()
+            if (paths.length === 0) return
+            var subView = root.activeSubView()
+            if (subView && subView.vimVisualMode !== undefined)
+                subView.vimVisualMode = false
+            if (root.isTrashView) {
+                deleteConfirmPaths = paths
+                root.openDialog(deleteConfirmDialogLoader)
+                return
+            }
+            var hasRemotePath = false
+            for (var i = 0; i < paths.length; ++i) {
+                if (fileOps.isRemotePath(paths[i])) {
+                    hasRemotePath = true
+                    break
+                }
+            }
+            if (hasRemotePath) fileOps.trashFiles(paths)
+            else undoManager.trashFiles(paths)
+        }
+    }
+
+    Shortcut {
+        sequence: "y"
+        enabled: config.vimNavigation && !root.searchMode
+                 && !(root.settingsPanel && root.settingsPanel.visible)
+        onActivated: {
+            var paths = root.getSelectedPaths()
+            if (paths.length > 0) clipboard.copy(paths)
+            var subView = root.activeSubView()
+            if (subView && subView.vimVisualMode !== undefined)
+                subView.vimVisualMode = false
+        }
+    }
+
+    Shortcut {
+        sequence: "p"
+        enabled: config.vimNavigation && !root.searchMode
+                 && !(root.settingsPanel && root.settingsPanel.visible)
+        onActivated: {
+            if (!clipboard.hasContent && !fileOps.hasClipboardImage()) return
+            if (root.paneIsRecents(activePane)) return
+            var dest = root.panePath(activePane)
+            if (dest) root.pasteIntoDirectory(dest)
+        }
+    }
+
+    Shortcut {
+        sequence: "u"
+        enabled: config.vimNavigation && root.shouldFocusActivePane()
+        onActivated: {
+            if (undoManager.canUndo) undoManager.undo()
+        }
+    }
+
+    Shortcut {
+        sequence: "Ctrl+R"
+        enabled: config.vimNavigation && root.shouldFocusActivePane()
+        onActivated: {
+            if (undoManager.canRedo) undoManager.redo()
+        }
+    }
+
+    Shortcut {
+        sequence: "z"
+        enabled: config.vimNavigation && root.shouldFocusActivePane()
+        onActivated: root.zenMode = !root.zenMode
+    }
+
+    Shortcut {
+        sequence: "."
+        enabled: config.vimNavigation && root.shouldFocusActivePane()
+        onActivated: fsModel.showHidden = !fsModel.showHidden
+    }
+
+    Shortcut {
+        sequence: "s"
+        enabled: config.vimNavigation && root.shouldFocusActivePane() && !root.zenMode
+        onActivated: {
+            root.sidebarVisible = true
+            root.sidebarWaitingForWidth = false
+            Qt.callLater(() => sidebarPanel.focusForKeyboard())
+        }
+    }
+
+    Shortcut {
+        sequence: "i"
+        enabled: config.vimNavigation && root.shouldFocusActivePane()
+        onActivated: {
+            root.zenMode = false
+            root.openSettingsPanel()
+        }
+    }
+
+    Shortcut {
+        sequence: "Ctrl+K"
+        enabled: config.vimNavigation && root.shouldFocusActivePane()
+        onActivated: {
+            root.zenMode = false
+            root.openKeyboardShortcutsDialog()
+        }
+    }
+
     Shortcut {
         sequence: config.shortcutMap["copy"]
         onActivated: {
@@ -4055,7 +4198,7 @@ ApplicationWindow {
         // Sidebar (full height, animated)
         Item {
                 id: sidebarHost
-                Layout.preferredWidth: root.sidebarVisible ? root.sidebarWidth : 0
+                Layout.preferredWidth: root.sidebarVisible && !root.zenMode ? root.sidebarWidth : 0
                 Layout.fillHeight: true
                 clip: true
 
@@ -4101,8 +4244,11 @@ ApplicationWindow {
                         root.setPaneRecents(root.activePane, true)
                     }
                     onCollapseClicked: root.toggleSidebar()
+                    onReturnToFilesRequested: {
+                        var subView = root.activeSubView()
+                        if (subView) subView.forceActiveFocus()
+                    }
                     onFeatureHintRequested: (message) => toast.show(message, "info")
-                    onCloudDriveConnectRequested: root.openCloudDriveDialog()
                 }
 
                 MouseArea {
@@ -4171,6 +4317,7 @@ ApplicationWindow {
             Toolbar {
                 id: toolbar
                 z: 5
+                visible: !root.zenMode
                 Layout.fillWidth: true
                 window: root
                 activeTab: tabModel.activeTab
@@ -4472,6 +4619,7 @@ ApplicationWindow {
 
                 StatusBar {
                     objectName: "statusBar"
+                    visible: !root.zenMode
                     Layout.fillWidth: true
                     itemCount: root.activeItemCount()
                     folderCount: root.activeFolderCount()

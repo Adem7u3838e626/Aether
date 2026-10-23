@@ -8,6 +8,7 @@
 #include <QDateTime>
 #include <QFileSystemWatcher>
 #include <QMap>
+#include <QDBusVariant>
 
 class ConfigManager : public QObject
 {
@@ -16,6 +17,8 @@ class ConfigManager : public QObject
     Q_PROPERTY(QStringList availableIconThemes READ availableIconThemes CONSTANT)
     Q_PROPERTY(QStringList availableThemes READ availableThemes CONSTANT)
     Q_PROPERTY(QString theme READ theme NOTIFY configChanged)
+    Q_PROPERTY(QString themeMode READ themeMode NOTIFY configChanged)
+    Q_PROPERTY(bool systemPrefersLight READ systemPrefersLight NOTIFY configChanged)
     Q_PROPERTY(QString iconTheme READ iconTheme NOTIFY configChanged)
     Q_PROPERTY(QString fontFamily READ fontFamily NOTIFY configChanged)
     Q_PROPERTY(QString defaultView READ defaultView NOTIFY configChanged)
@@ -33,6 +36,7 @@ class ConfigManager : public QObject
     Q_PROPERTY(int sidebarWidth READ sidebarWidth NOTIFY configChanged)
     Q_PROPERTY(bool sidebarVisible READ sidebarVisible NOTIFY configChanged)
     Q_PROPERTY(int sidebarAutoHideWidth READ sidebarAutoHideWidth NOTIFY configChanged)
+    Q_PROPERTY(bool expandTransfersByDefault READ expandTransfersByDefault NOTIFY configChanged)
     Q_PROPERTY(QStringList hiddenQuickAccess READ hiddenQuickAccess NOTIFY configChanged)
     Q_PROPERTY(QStringList bookmarks READ bookmarks NOTIFY configChanged)
     Q_PROPERTY(QVariantMap bookmarkNames READ bookmarkNames NOTIFY configChanged)
@@ -67,13 +71,23 @@ class ConfigManager : public QObject
 public:
     explicit ConfigManager(const QString &configPath, QObject *parent = nullptr,
                            const QStringList &themesDirs = QStringList(),
-                           const QString &defaultTheme = QStringLiteral("catppuccin-mocha"));
+                           const QString &defaultTheme = QStringLiteral("catppuccin-mocha"),
+                           bool systemPrefersLight = false);
 
     QStringList availableFonts() const;
     QStringList availableIconThemes() const;
     QStringList availableThemes() const;
     QString configPath() const;
     QString theme() const;
+    QString themeMode() const;
+    bool systemPrefersLight() const;
+    void setSystemPrefersLight(bool light);
+
+public slots:
+    void handleDesktopSettingChanged(const QString &nameSpace, const QString &key,
+                                    const QDBusVariant &value);
+
+public:
     QString lightTheme() const;
     QString darkTheme() const;
     QString iconTheme() const;
@@ -99,6 +113,7 @@ public:
     bool sidebarVisible() const;
     // Window width below which the sidebar folds away on its own; 0 disables it.
     int sidebarAutoHideWidth() const;
+    bool expandTransfersByDefault() const;
     QStringList hiddenQuickAccess() const;
     // Detailed (list) view columns, in display order. "name" is always present.
     QStringList listColumns() const;
@@ -188,8 +203,10 @@ private:
     QDateTime m_configModified;
 
     QString m_theme;
+    QString m_themeMode;
     QString m_lightTheme;
     QString m_darkTheme;
+    bool m_systemPrefersLight = false;
     QString m_iconTheme;          // as configured; empty means follow the desktop
     QString m_iconThemeFallback;  // what empty resolves to
     QString m_fontFamily;
@@ -208,6 +225,7 @@ private:
     int m_sidebarWidth;
     bool m_sidebarVisible;
     int m_sidebarAutoHideWidth;
+    bool m_expandTransfersByDefault;
     QStringList m_hiddenQuickAccess;
     QStringList m_listColumns;
     QVariantMap m_listColumnWidths;

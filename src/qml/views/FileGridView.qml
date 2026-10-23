@@ -11,10 +11,13 @@ GridView {
     property var selectedIndices: []
     property int lastSelectedIndex: -1   // anchor for shift-selection
     property int cursorIndex: -1         // moving end for keyboard navigation
+    property bool vimGoPending: false
+    property bool vimVisualMode: false
 
     // Current directory path (used as drop target)
     property string currentPath: ""
     onCurrentPathChanged: {
+        vimVisualMode = false
         clearSelection()
         pendingFocusPath = ""
         typeAheadBuffer = ""
@@ -174,14 +177,45 @@ GridView {
         positionViewAtIndex(next, GridView.Contain)
     }
 
+    function toggleVimVisualMode() {
+        if (vimVisualMode) {
+            vimVisualMode = false
+            return
+        }
+        var anchor = cursorIndex >= 0 ? cursorIndex
+            : (selectedIndices.length > 0 ? selectedIndices[selectedIndices.length - 1] : 0)
+        moveSelectionTo(anchor, false)
+        vimVisualMode = true
+    }
+
     Keys.onLeftPressed: (event) => moveSelection(-1, event.modifiers & Qt.ShiftModifier)
     Keys.onRightPressed: (event) => moveSelection(1, event.modifiers & Qt.ShiftModifier)
     Keys.onUpPressed: (event) => moveSelection(-effectiveColumnCount, event.modifiers & Qt.ShiftModifier)
     Keys.onDownPressed: (event) => moveSelection(effectiveColumnCount, event.modifiers & Qt.ShiftModifier)
     Keys.onPressed: (event) => {
+        if (config.vimNavigation && event.key === Qt.Key_G) {
+            if (event.modifiers & Qt.ShiftModifier) {
+                vimGoPending = false
+                vimGoTimer.stop()
+                moveSelectionTo(count - 1, vimVisualMode)
+            } else if (vimGoPending) {
+                vimGoPending = false
+                vimGoTimer.stop()
+                moveSelectionTo(0, vimVisualMode)
+            } else {
+                vimGoPending = true
+                vimGoTimer.restart()
+            }
+            event.accepted = true
+            return
+        }
+        if (vimGoPending) {
+            vimGoPending = false
+            vimGoTimer.stop()
+        }
         if (config.vimNavigation
                 && (event.modifiers === Qt.NoModifier || event.modifiers === Qt.ShiftModifier)) {
-            var extendSelection = (event.modifiers & Qt.ShiftModifier) !== 0
+            var extendSelection = (event.modifiers & Qt.ShiftModifier) !== 0 || vimVisualMode
             var vimKeyHandled = true
             if (event.key === Qt.Key_H) moveSelection(-1, extendSelection)
             else if (event.key === Qt.Key_J) moveSelection(effectiveColumnCount, extendSelection)
@@ -226,6 +260,12 @@ GridView {
         interval: 1000
         repeat: false
         onTriggered: root.typeAheadBuffer = ""
+    }
+
+    Timer {
+        id: vimGoTimer
+        interval: 650
+        onTriggered: root.vimGoPending = false
     }
 
     ScrollBar.vertical: ScrollBar {

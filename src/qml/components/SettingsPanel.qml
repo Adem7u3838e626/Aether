@@ -44,6 +44,7 @@ Window {
     readonly property bool defaultTransparencyEnabled: true
     readonly property real defaultTransparencyLevel: 1.0
     readonly property bool defaultAnimationsEnabled: true
+    readonly property bool defaultExpandTransfersByDefault: false
     readonly property int defaultAnimDurationFast: 100
     readonly property int defaultAnimDuration: 200
     readonly property int defaultAnimDurationSlow: 350
@@ -75,9 +76,9 @@ Window {
     property bool pendingSettingsDirty: false
 
     property string draftTheme: config.theme
+    property string draftThemeMode: config.themeMode
     property string draftFontFamily: config.fontFamily
     property string draftIconTheme: config.iconTheme
-    property bool draftDarkMode: true
     property bool draftShowHidden: currentShowHidden
     property bool draftHiddenLast: config.hiddenLast
     property bool draftRightClickToEditPath: config.rightClickToEditPath
@@ -92,6 +93,7 @@ Window {
     property string draftSplitOrientation: config.splitOrientation
     property int draftSidebarWidth: currentSidebarWidth
     property int draftSidebarAutoHideWidth: config.sidebarAutoHideWidth
+    property bool draftExpandTransfersByDefault: config.expandTransfersByDefault
     property int draftRadiusSmall: config.radiusSmall
     property int draftRadiusMedium: config.radiusMedium
     property int draftRadiusLarge: config.radiusLarge
@@ -147,6 +149,7 @@ Window {
     }
 
     signal remoteConnectRequested()
+    signal cloudDriveConnectRequested()
     signal keyboardShortcutsRequested()
     signal dependenciesRequested()
     signal closed()
@@ -156,6 +159,7 @@ Window {
     Component { id: paletteSectionIcon; IconSettings {} }
     Component { id: layoutSectionIcon; IconPanelLeft {} }
     Component { id: motionSectionIcon; IconClock {} }
+    Component { id: driveSectionIcon; IconCloud {} }
     Component { id: toolsSectionIcon; IconFolder {} }
     Component { id: pluginsSectionIcon; IconPackageOpen {} }
 
@@ -165,6 +169,7 @@ Window {
         { title: "Look & Feel", iconComponent: paletteSectionIcon },
         { title: "Layout", iconComponent: layoutSectionIcon },
         { title: "Motion", iconComponent: motionSectionIcon },
+        { title: "Drive", iconComponent: driveSectionIcon },
         { title: "Tools", iconComponent: toolsSectionIcon },
         { title: "Plugins", iconComponent: pluginsSectionIcon }
     ]
@@ -172,6 +177,7 @@ Window {
         { title: "Look & Feel", subtitle: "Theme, typography, icons, and surface styling.", iconComponent: paletteSectionIcon },
         { title: "Layout", subtitle: "Sidebar behavior, file visibility, and toolbar controls.", iconComponent: layoutSectionIcon },
         { title: "Motion", subtitle: "Animation timing and easing across the interface.", iconComponent: motionSectionIcon },
+        { title: "Drive", subtitle: "Connect cloud storage and review configured drives.", iconComponent: driveSectionIcon },
         { title: "Tools", subtitle: "Shortcuts, remote locations, and config behavior.", iconComponent: toolsSectionIcon },
         { title: "Plugins", subtitle: "Optional extensions for Aether.", iconComponent: pluginsSectionIcon }
     ]
@@ -235,6 +241,16 @@ Window {
     property var lightThemeOptions: []
     property var darkThemeOptions: []
 
+    function setDraftThemeMode(mode) {
+        draftThemeMode = mode
+        if (mode === "light")
+            draftTheme = draftLightTheme
+        else if (mode === "dark")
+            draftTheme = draftDarkTheme
+        else if (mode === "system")
+            draftTheme = config.systemPrefersLight ? draftLightTheme : draftDarkTheme
+    }
+
     function isDarkTheme(themeName) {
         return (0.2126 * Theme.base.r + 0.7152 * Theme.base.g
                 + 0.0722 * Theme.base.b) < 0.5
@@ -242,7 +258,7 @@ Window {
 
     function setDraftTheme(themeName) {
         draftTheme = themeName
-        draftDarkMode = isDarkTheme(themeName)
+        draftThemeMode = "custom"
     }
 
     function bindAppearancePreview() {
@@ -268,6 +284,9 @@ Window {
 
     function resetToDefaults() {
         setDraftTheme(defaultThemeName)
+        draftThemeMode = "system"
+        draftLightTheme = "catppuccin-latte"
+        draftDarkTheme = defaultThemeName
         draftFontFamily = ""
         draftIconTheme = defaultIconThemeName
         draftShowHidden = false
@@ -282,6 +301,7 @@ Window {
         draftSplitOrientation = "vertical"
         draftSidebarWidth = defaultSidebarWidth
         draftSidebarAutoHideWidth = defaultSidebarAutoHideWidth
+        draftExpandTransfersByDefault = defaultExpandTransfersByDefault
         draftRadiusSmall = defaultRadiusSmall
         draftRadiusMedium = defaultRadiusMedium
         draftRadiusLarge = defaultRadiusLarge
@@ -307,7 +327,7 @@ Window {
         syncingFromConfig = true
         try {
             draftTheme = config.theme
-            draftDarkMode = isDarkTheme(draftTheme)
+            draftThemeMode = config.themeMode
             themeOptions = buildOptions(availableThemeValues, draftTheme, "catppuccin-mocha")
             draftLightTheme = config.lightTheme
             draftDarkTheme = config.darkTheme
@@ -332,6 +352,7 @@ Window {
             draftSplitOrientation = config.splitOrientation
             draftSidebarWidth = currentSidebarWidth
             draftSidebarAutoHideWidth = config.sidebarAutoHideWidth
+            draftExpandTransfersByDefault = config.expandTransfersByDefault
             draftRadiusSmall = config.radiusSmall
             draftRadiusMedium = Math.max(config.radiusMedium, draftRadiusSmall)
             draftRadiusLarge = Math.max(config.radiusLarge, draftRadiusMedium)
@@ -379,6 +400,11 @@ Window {
         remoteConnectRequested()
     }
 
+    function openCloudDriveConnect() {
+        closePanel()
+        cloudDriveConnectRequested()
+    }
+
     function openKeyboardShortcuts() {
         closePanel()
         keyboardShortcutsRequested()
@@ -392,6 +418,7 @@ Window {
     function currentSettings() {
         return {
             theme: draftTheme,
+            themeMode: draftThemeMode,
             lightTheme: draftLightTheme,
             darkTheme: draftDarkTheme,
             fontFamily: draftFontFamily,
@@ -408,6 +435,7 @@ Window {
             splitOrientation: draftSplitOrientation,
             sidebarWidth: draftSidebarWidth,
             sidebarAutoHideWidth: draftSidebarAutoHideWidth,
+            expandTransfersByDefault: draftExpandTransfersByDefault,
             radiusSmall: draftRadiusSmall,
             radiusMedium: draftRadiusMedium,
             radiusLarge: draftRadiusLarge,
@@ -493,7 +521,7 @@ Window {
                 spacing: 12
 
                 Text {
-                    text: "Dark Mode"
+                    text: "Appearance"
                     color: Theme.text
                     font.pointSize: Theme.fontNormal + 2
                     font.bold: true
@@ -501,11 +529,13 @@ Window {
 
                 Item { Layout.fillWidth: true }
 
-                Q.Toggle {
+                Q.Dropdown {
+                    Layout.preferredWidth: 190
                     label: ""
-                    checked: root.draftDarkMode
-                    onToggled: (value) => {
-                        root.setDraftTheme(value ? root.draftDarkTheme : root.draftLightTheme)
+                    model: ["System", "Light", "Dark", "Custom"]
+                    currentIndex: Math.max(0, ["system", "light", "dark", "custom"].indexOf(root.draftThemeMode))
+                    onSelected: (index, _) => {
+                        root.setDraftThemeMode(["system", "light", "dark", "custom"][index])
                         root.applySettingsNow()
                     }
                 }
@@ -534,12 +564,8 @@ Window {
                 }
             }
 
-            // A plain currentIndex binding would be gone the moment someone
-            // picks a row, because Quill's Dropdown assigns to it. A Binding
-            // element reasserts itself whenever draftTheme changes, which is
-            // what the Dark Mode switch does without touching the dropdown.
             Text {
-                text: "The Dark Mode switch above flips between these two."
+                text: "System follows your desktop appearance preference. Light and Dark use the paired themes below. Choose Custom to select any theme."
                 color: Theme.subtext
                 font.pointSize: Theme.fontSmall
                 wrapMode: Text.WordWrap
@@ -734,12 +760,21 @@ Window {
 
             Q.Toggle {
                 Layout.fillWidth: true
-                label: "Use Vim navigation keys (h/j/k/l)"
+                label: "Vim-style file controls"
                 checked: root.draftVimNavigation
                 onToggled: (value) => {
                     root.draftVimNavigation = value
                     root.applySettingsNow()
                 }
+            }
+
+            Text {
+                Layout.fillWidth: true
+                Layout.leftMargin: 12
+                text: "Navigate with h/j/k/l, jump with gg and G, select ranges with v, search with /, open with o, trash with dd, copy with y, paste with p, undo with u, redo with Ctrl+r, toggle hidden files with ., focus the sidebar with s, open Settings with i, open shortcuts with Ctrl+k, and toggle Zen mode with z. For example, gg v G y copies everything."
+                color: Theme.subtext
+                font.pointSize: Theme.fontSmall
+                wrapMode: Text.WordWrap
             }
 
             Q.Toggle {
@@ -794,6 +829,16 @@ Window {
                 checked: root.draftSidebarAutoHideWidth > 0
                 onToggled: (value) => {
                     root.draftSidebarAutoHideWidth = value ? root.defaultSidebarAutoHideWidth : 0
+                    root.applySettingsNow()
+                }
+            }
+
+            Q.Toggle {
+                Layout.fillWidth: true
+                label: "Start file transfers expanded"
+                checked: root.draftExpandTransfersByDefault
+                onToggled: (value) => {
+                    root.draftExpandTransfersByDefault = value
                     root.applySettingsNow()
                 }
             }
@@ -1182,6 +1227,89 @@ Window {
     }
 
     Component {
+        id: drivePageComponent
+
+        ColumnLayout {
+            width: pageLoader.width
+            spacing: 12
+
+            Text {
+                Layout.fillWidth: true
+                text: "Connect cloud storage to browse and transfer files from your cloud accounts."
+                color: Theme.subtext
+                font.pointSize: Theme.fontNormal
+                wrapMode: Text.WordWrap
+            }
+
+            Q.Button {
+                Layout.alignment: Qt.AlignLeft
+                text: "Add a cloud drive"
+                onClicked: root.openCloudDriveConnect()
+            }
+
+            Text {
+                Layout.topMargin: 8
+                text: "Connected drives"
+                color: Theme.accent
+                font.pointSize: Theme.fontSmall
+                font.bold: true
+            }
+
+            Text {
+                visible: rcloneService.remoteNames.length === 0
+                Layout.fillWidth: true
+                text: "No cloud drives are configured yet."
+                color: Theme.muted
+                font.pointSize: Theme.fontSmall
+            }
+
+            Repeater {
+                model: rcloneService.remoteNames
+
+                delegate: Rectangle {
+                    required property string modelData
+                    Layout.fillWidth: true
+                    implicitHeight: 38
+                    readonly property var activeMountsSnapshot: rcloneService.activeMounts
+                    readonly property bool mounted: activeMountsSnapshot.indexOf(modelData) >= 0
+                        && rcloneService.isMounted(modelData)
+                    radius: Math.min(Theme.radiusSmall, 4)
+                    color: Theme.containerColor(Theme.surface, 0.45)
+                    border.width: 1
+                    border.color: root.sectionBorderColor
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 10
+                        anchors.rightMargin: 10
+                        spacing: 8
+
+                        IconCloud {
+                            Layout.preferredWidth: 18
+                            Layout.preferredHeight: 18
+                            color: parent.parent.mounted ? Theme.accent : Theme.subtext
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: modelData
+                            color: Theme.text
+                            font.pointSize: Theme.fontNormal
+                            elide: Text.ElideRight
+                        }
+
+                        Text {
+                            text: parent.parent.mounted ? "Mounted" : "Not mounted"
+                            color: parent.parent.mounted ? Theme.success : Theme.muted
+                            font.pointSize: Theme.fontSmall
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Component {
         id: toolsPageComponent
 
         ColumnLayout {
@@ -1243,9 +1371,38 @@ Window {
 
             RowLayout {
                 Layout.fillWidth: true
+                spacing: 8
+
+                Q.TextField {
+                    id: pluginRepositoryUrl
+                    Layout.fillWidth: true
+                    placeholder: "HTTPS or SSH Git repository URL"
+                }
+
+                Q.Button {
+                    text: pluginManager.installingRepository ? "Installing…" : "Install"
+                    enabled: !pluginManager.installingRepository
+                    onClicked: {
+                        if (pluginManager.installFromRepository(pluginRepositoryUrl.text))
+                            pluginRepositoryUrl.text = ""
+                    }
+                }
+            }
+
+            Text {
+                Layout.fillWidth: true
+                text: pluginManager.repositoryInstallStatus
+                visible: text !== ""
+                color: Theme.subtext
+                font.pointSize: Theme.fontSmall
+                wrapMode: Text.WordWrap
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
                 Text {
                     Layout.fillWidth: true
-                    text: "Install Lua plugins in “%1”. Plugins run with the same permissions as Aether; only install code you trust. Changes take effect immediately."
+                    text: "Install Lua plugins from Git repositories or in “%1”. Review their requested permissions before enabling them; plugins run with the same permissions as Aether."
                         .arg(pluginManager.pluginDirectory)
                     color: Theme.subtext
                     font.pointSize: Theme.fontSmall
@@ -1504,12 +1661,6 @@ Window {
                             Row {
                                 Layout.leftMargin: 12
                                 Layout.bottomMargin: 12
-                                spacing: 6
-
-                                IconSettings {
-                                    size: 16
-                                    color: Theme.text
-                                }
 
                                 Text {
                                     text: "Settings"
@@ -1597,8 +1748,10 @@ Window {
                                             : root.currentSectionIndex === 2
                                                 ? motionPageComponent
                                                 : root.currentSectionIndex === 3
-                                                    ? toolsPageComponent
-                                                    : pluginsPageComponent
+                                                    ? drivePageComponent
+                                                    : root.currentSectionIndex === 4
+                                                        ? toolsPageComponent
+                                                        : pluginsPageComponent
                                 }
                             }
                         }

@@ -971,6 +971,10 @@ int main(int argc, char *argv[])
 
     // Set icon theme so QIcon::fromTheme() works (e.g. for drag pixmaps)
     QIcon::setThemeName(config->iconTheme());
+    app.setWindowIcon(QIcon::fromTheme(
+        QStringLiteral("io.github.adem7u3838e626.Aether"),
+        QIcon(QStringLiteral(AETHER_DATA_DIR)
+              + QStringLiteral("/dist/io.github.adem7u3838e626.Aether.svg"))));
 
     // Register image providers (keep pointer to IconProvider for DragHelper)
     auto *iconProvider = new IconProvider(config->iconTheme());

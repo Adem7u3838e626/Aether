@@ -202,11 +202,12 @@ QMap<QString, QString> ConfigManager::s_defaultShortcuts = {
 };
 
 ConfigManager::ConfigManager(const QString &configPath, QObject *parent, const QStringList &themesDirs,
-                             const QString &defaultTheme)
+                             const QString &defaultTheme, bool systemPrefersLight)
     : QObject(parent)
     , m_configPath(configPath)
     , m_themesDirs(themesDirs)
     , m_defaultThemeName(defaultTheme)
+    , m_systemPrefersLight(systemPrefersLight)
 {
     setDefaults();
     seedDocumentedConfig();
@@ -291,6 +292,7 @@ void ConfigManager::setDefaults()
     m_theme = m_defaultThemeName.trimmed().isEmpty()
         ? QStringLiteral("catppuccin-mocha")
         : m_defaultThemeName.trimmed();
+    m_themeMode = QStringLiteral("system");
     m_lightTheme = QStringLiteral("catppuccin-latte");
     m_darkTheme = QStringLiteral("catppuccin-mocha");
     // Empty means "whatever the desktop is set to": main.cpp asks the XDG
@@ -316,6 +318,7 @@ void ConfigManager::setDefaults()
     m_dependencyStartupCheck = true;
     m_sidebarVisible = true;
     m_sidebarAutoHideWidth = 700;
+    m_expandTransfersByDefault = false;
     m_hiddenQuickAccess.clear();
     setListColumnsNormalized({}, {});
     setMillerFractionsClamped(0.2, 0.5);
@@ -362,12 +365,27 @@ void ConfigManager::loadConfig()
         m_showWindowControls = m_showWindowControlsRuntimeDefault;
 
 
-        if (auto v = config["general"]["theme"].value<std::string>())
-            m_theme = QString::fromStdString(*v);
+        const auto configuredTheme = config["general"]["theme"].value<std::string>();
+        if (configuredTheme)
+            m_theme = QString::fromStdString(*configuredTheme);
+        if (auto v = config["general"]["theme_mode"].value<std::string>()) {
+            const QString mode = QString::fromStdString(*v).trimmed().toLower();
+            if (mode == "system" || mode == "light" || mode == "dark" || mode == "custom")
+                m_themeMode = mode;
+        } else if (configuredTheme) {
+            // Existing configs with a manually selected theme retain it.
+            m_themeMode = QStringLiteral("custom");
+        }
         if (auto v = config["general"]["light_theme"].value<std::string>())
             m_lightTheme = QString::fromStdString(*v);
         if (auto v = config["general"]["dark_theme"].value<std::string>())
             m_darkTheme = QString::fromStdString(*v);
+        if (m_themeMode == QLatin1String("system"))
+            m_theme = m_systemPrefersLight ? m_lightTheme : m_darkTheme;
+        else if (m_themeMode == QLatin1String("light"))
+            m_theme = m_lightTheme;
+        else if (m_themeMode == QLatin1String("dark"))
+            m_theme = m_darkTheme;
         if (auto v = config["general"]["icon_theme"].value<std::string>())
             m_iconTheme = QString::fromStdString(*v);
         if (auto v = config["general"]["font_family"].value<std::string>())
@@ -408,6 +426,8 @@ void ConfigManager::loadConfig()
             m_sidebarVisible = *v;
         if (auto v = config["sidebar"]["auto_hide_width"].value<int64_t>())
             m_sidebarAutoHideWidth = clampedAutoHideWidth(static_cast<int>(*v));
+        if (auto v = config["sidebar"]["expand_transfers_by_default"].value<bool>())
+            m_expandTransfersByDefault = *v;
 
         // Quick-access entries the user removed from the sidebar, by name
         // ("Pictures", "Network", ...). Absent key = show everything.
@@ -636,6 +656,7 @@ QString ConfigManager::documentedConfigTemplate()
 # two themes; a script can also just rewrite "theme" above and Aether reloads.
 light_theme = "catppuccin-latte"
 dark_theme = "catppuccin-mocha"
+theme_mode = "system" # "system" | "light" | "dark" | "custom"
 
 # Icon theme for file and folder icons (a directory name under
 # /usr/share/icons or ~/.icons). Toolbar and sidebar icons are built in.
@@ -688,6 +709,8 @@ visible = true
 # It stays toggleable by hand, and comes back when the window grows again.
 # 0 turns it off; anything else is clamped to 320-2000.
 auto_hide_width = 700
+# Start new file transfers with the detailed progress view expanded.
+expand_transfers_by_default = false
 # Quick-access entries to hide. Valid names:
 # "Home", "Recents", "Trash", "Network", "Pictures", "Downloads"
 hidden_quick_access = []
@@ -916,6 +939,34 @@ void ConfigManager::saveListColumns(const QStringList &columns, const QVariantMa
 }
 
 QString ConfigManager::theme() const { return m_theme; }
+QString ConfigManager::themeMode() const { return m_themeMode; }
+bool ConfigManager::systemPrefersLight() const { return m_systemPrefersLight; }
+
+void ConfigManager::setSystemPrefersLight(bool light)
+{
+    if (m_systemPrefersLight == light)
+        return;
+    m_systemPrefersLight = light;
+    if (m_themeMode == QLatin1String("system"))
+        m_theme = light ? m_lightTheme : m_darkTheme;
+    emit configChanged();
+}
+
+void ConfigManager::handleDesktopSettingChanged(const QString &nameSpace, const QString &key,
+                                                const QDBusVariant &value)
+{
+    if (nameSpace != QLatin1String("org.freedesktop.appearance")
+        || key != QLatin1String("color-scheme"))
+        return;
+
+    QVariant colorScheme = value.variant();
+    if (colorScheme.canConvert<QDBusVariant>())
+        colorScheme = colorScheme.value<QDBusVariant>().variant();
+    bool ok = false;
+    const uint scheme = colorScheme.toUInt(&ok);
+    if (ok && (scheme == 1 || scheme == 2))
+        setSystemPrefersLight(scheme == 2);
+}
 QString ConfigManager::lightTheme() const { return m_lightTheme; }
 QString ConfigManager::darkTheme() const { return m_darkTheme; }
 QString ConfigManager::iconTheme() const
@@ -949,6 +1000,7 @@ QString ConfigManager::sidebarPosition() const { return m_sidebarPosition; }
 int ConfigManager::sidebarWidth() const { return m_sidebarWidth; }
 bool ConfigManager::sidebarVisible() const { return m_sidebarVisible; }
 int ConfigManager::sidebarAutoHideWidth() const { return m_sidebarAutoHideWidth; }
+bool ConfigManager::expandTransfersByDefault() const { return m_expandTransfersByDefault; }
 QStringList ConfigManager::hiddenQuickAccess() const { return m_hiddenQuickAccess; }
 QStringList ConfigManager::bookmarks() const { return m_bookmarks; }
 QVariantList ConfigManager::savedSplits() const { return m_savedSplits; }
@@ -1165,6 +1217,29 @@ void ConfigManager::saveSettings(const QVariantMap &settings)
         general.insert_or_assign(tomlKey, value.toStdString());
     }
 
+    const bool themePreferencesChanged = settings.contains("themeMode")
+        || settings.contains("theme") || settings.contains("lightTheme")
+        || settings.contains("darkTheme");
+    if (settings.contains("themeMode")) {
+        const QString mode = settings.value("themeMode").toString().trimmed().toLower();
+        if (mode == "system" || mode == "light" || mode == "dark" || mode == "custom")
+            m_themeMode = mode;
+    } else if (settings.contains("theme")) {
+        m_themeMode = QStringLiteral("custom");
+    }
+
+    if (m_themeMode == QLatin1String("system"))
+        m_theme = m_systemPrefersLight ? m_lightTheme : m_darkTheme;
+    else if (m_themeMode == QLatin1String("light"))
+        m_theme = m_lightTheme;
+    else if (m_themeMode == QLatin1String("dark"))
+        m_theme = m_darkTheme;
+
+    if (themePreferencesChanged) {
+        general.insert_or_assign("theme_mode", m_themeMode.toStdString());
+        general.insert_or_assign("theme", m_theme.toStdString());
+    }
+
     if (settings.contains("iconTheme")) {
         const QString iconTheme = settings.value("iconTheme").toString().trimmed();
         if (!iconTheme.isEmpty()) {
@@ -1249,6 +1324,11 @@ void ConfigManager::saveSettings(const QVariantMap &settings)
     if (settings.contains("sidebarAutoHideWidth")) {
         m_sidebarAutoHideWidth = clampedAutoHideWidth(settings.value("sidebarAutoHideWidth").toInt());
         sidebar.insert_or_assign("auto_hide_width", m_sidebarAutoHideWidth);
+    }
+
+    if (settings.contains("expandTransfersByDefault")) {
+        m_expandTransfersByDefault = settings.value("expandTransfersByDefault").toBool();
+        sidebar.insert_or_assign("expand_transfers_by_default", m_expandTransfersByDefault);
     }
 
     if (settings.contains("sidebarWidth")) {

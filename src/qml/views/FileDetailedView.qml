@@ -12,12 +12,15 @@ FocusScope {
     property var selectedIndices: []
     property int lastSelectedIndex: -1   // anchor for shift-selection
     property int cursorIndex: -1         // moving end for keyboard navigation
+    property bool vimGoPending: false
+    property bool vimVisualMode: false
     property string sortColumn: "name"
     property bool sortAscending: true
 
     // Current directory path (used as drop target)
     property string currentPath: ""
     onCurrentPathChanged: {
+        vimVisualMode = false
         clearSelection()
         pendingFocusPath = ""
         typeAheadBuffer = ""
@@ -335,6 +338,17 @@ FocusScope {
 
         cursorIndex = next
         listView.positionViewAtIndex(next, ListView.Contain)
+    }
+
+    function toggleVimVisualMode() {
+        if (vimVisualMode) {
+            vimVisualMode = false
+            return
+        }
+        var anchor = cursorIndex >= 0 ? cursorIndex
+            : (selectedIndices.length > 0 ? selectedIndices[selectedIndices.length - 1] : 0)
+        moveSelectionTo(anchor, false)
+        vimVisualMode = true
     }
 
     Timer {
@@ -971,9 +985,29 @@ FocusScope {
             Keys.onUpPressed: (event) => moveSelection(-1, event.modifiers & Qt.ShiftModifier)
             Keys.onDownPressed: (event) => moveSelection(1, event.modifiers & Qt.ShiftModifier)
             Keys.onPressed: (event) => {
+                if (config.vimNavigation && event.key === Qt.Key_G) {
+                    if (event.modifiers & Qt.ShiftModifier) {
+                        root.vimGoPending = false
+                        vimGoTimer.stop()
+                        root.moveSelectionTo(count - 1, root.vimVisualMode)
+                    } else if (root.vimGoPending) {
+                        root.vimGoPending = false
+                        vimGoTimer.stop()
+                        root.moveSelectionTo(0, root.vimVisualMode)
+                    } else {
+                        root.vimGoPending = true
+                        vimGoTimer.restart()
+                    }
+                    event.accepted = true
+                    return
+                }
+                if (root.vimGoPending) {
+                    root.vimGoPending = false
+                    vimGoTimer.stop()
+                }
                 if (config.vimNavigation
                         && (event.modifiers === Qt.NoModifier || event.modifiers === Qt.ShiftModifier)) {
-                    var extendSelection = (event.modifiers & Qt.ShiftModifier) !== 0
+                    var extendSelection = (event.modifiers & Qt.ShiftModifier) !== 0 || root.vimVisualMode
                     if (event.key === Qt.Key_J) {
                         moveSelection(1, extendSelection)
                         event.accepted = true
@@ -1015,6 +1049,12 @@ FocusScope {
                     return
                 }
                 root.handleTypeAhead(event)
+            }
+
+            Timer {
+                id: vimGoTimer
+                interval: 650
+                onTriggered: root.vimGoPending = false
             }
 
             ScrollBar.vertical: ScrollBar {

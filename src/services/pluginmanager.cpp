@@ -16,6 +16,8 @@
 #include <QMimeDatabase>
 #include <QProcess>
 #include <QStandardPaths>
+#include <QUuid>
+#include <utility>
 
 extern "C" {
 #include <lua.h>
@@ -338,6 +340,12 @@ PluginManager::PluginManager(FileOperations *fileOperations, QObject *parent)
 
 PluginManager::~PluginManager()
 {
+    if (m_repositoryProcess && m_repositoryProcess->state() != QProcess::NotRunning) {
+        m_repositoryProcess->kill();
+        m_repositoryProcess->waitForFinished(1000);
+    }
+    if (!m_repositoryStagingPath.isEmpty())
+        QDir(m_repositoryStagingPath).removeRecursively();
     const auto ids = m_runtimes.keys();
     for (const auto &id : ids) stopPlugin(id);
 }
@@ -374,6 +382,116 @@ QHash<int, QByteArray> PluginManager::roleNames() const
 }
 
 QString PluginManager::pluginDirectory() const { return m_directory; }
+bool PluginManager::installingRepository() const { return m_repositoryProcess != nullptr; }
+QString PluginManager::repositoryInstallStatus() const { return m_repositoryInstallStatus; }
+
+void PluginManager::finishRepositoryInstall(bool success, const QString &message)
+{
+    const QString stagingPath = std::exchange(m_repositoryStagingPath, QString());
+    if (!success && !stagingPath.isEmpty())
+        QDir(stagingPath).removeRecursively();
+    m_repositoryInstallStatus = message;
+    emit repositoryInstallChanged();
+}
+
+bool PluginManager::installFromRepository(const QString &rawUrl)
+{
+    if (m_repositoryProcess)
+        return false;
+
+    const QUrl url(rawUrl.trimmed());
+    if (!url.isValid() || url.host().isEmpty()
+        || (url.scheme() != QStringLiteral("https") && url.scheme() != QStringLiteral("ssh"))) {
+        m_repositoryInstallStatus = QStringLiteral("Enter a valid HTTPS or SSH Git repository URL.");
+        emit repositoryInstallChanged();
+        return false;
+    }
+
+    const QString git = QStandardPaths::findExecutable(QStringLiteral("git"));
+    if (git.isEmpty()) {
+        m_repositoryInstallStatus = QStringLiteral("Git is required to install a plugin repository.");
+        emit repositoryInstallChanged();
+        return false;
+    }
+
+    QDir().mkpath(m_directory);
+    m_repositoryStagingPath = QDir(m_directory).filePath(
+        QStringLiteral(".install-") + QUuid::createUuid().toString(QUuid::WithoutBraces));
+    auto *process = new QProcess(this);
+    m_repositoryProcess = process;
+    m_repositoryInstallStatus = QStringLiteral("Cloning plugin repository…");
+    emit repositoryInstallChanged();
+
+    QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
+    environment.insert(QStringLiteral("GIT_TERMINAL_PROMPT"), QStringLiteral("0"));
+    process->setProcessEnvironment(environment);
+    process->setProgram(git);
+    process->setArguments({QStringLiteral("clone"), QStringLiteral("--depth"), QStringLiteral("1"),
+                           QStringLiteral("--"), url.toString(), m_repositoryStagingPath});
+    connect(process, &QProcess::finished, this,
+            [this, process](int exitCode, QProcess::ExitStatus exitStatus) {
+        const QString errorOutput = QString::fromLocal8Bit(process->readAllStandardError()).trimmed();
+        m_repositoryProcess = nullptr;
+        process->deleteLater();
+
+        if (exitStatus != QProcess::NormalExit || exitCode != 0) {
+            finishRepositoryInstall(false, errorOutput.isEmpty()
+                ? QStringLiteral("Git could not clone this repository.") : errorOutput);
+            return;
+        }
+
+        const QDir staging(m_repositoryStagingPath);
+        QFile manifest(staging.filePath(QStringLiteral("plugin.json")));
+        if (!manifest.open(QIODevice::ReadOnly)) {
+            finishRepositoryInstall(false, QStringLiteral("Repository has no plugin.json at its root."));
+            return;
+        }
+        QJsonParseError parseError;
+        const QJsonDocument document = QJsonDocument::fromJson(manifest.readAll(), &parseError);
+        const QJsonObject object = document.object();
+        const QString id = object.value(QStringLiteral("id")).toString();
+        static const QRegularExpression validPluginId(QStringLiteral("^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$"));
+        if (parseError.error != QJsonParseError::NoError || !document.isObject()
+            || !validPluginId.match(id).hasMatch()) {
+            finishRepositoryInstall(false, QStringLiteral("Repository has an invalid plugin.json id."));
+            return;
+        }
+
+        const QString entryName = object.value(QStringLiteral("entry")).toString(QStringLiteral("main.lua"));
+        const QFileInfo entryInfo(staging.filePath(entryName));
+        const QString stagingCanonical = QFileInfo(m_repositoryStagingPath).canonicalFilePath();
+        const QString entryCanonical = entryInfo.canonicalFilePath();
+        if (stagingCanonical.isEmpty() || !entryInfo.isFile() || entryCanonical.isEmpty()
+            || !entryCanonical.startsWith(stagingCanonical + QDir::separator())) {
+            finishRepositoryInstall(false, QStringLiteral("Repository entry file is missing or outside the plugin folder."));
+            return;
+        }
+
+        const QString destination = QDir(m_directory).filePath(id);
+        if (QFileInfo::exists(destination)) {
+            finishRepositoryInstall(false, QStringLiteral("A plugin named “%1” is already installed.").arg(id));
+            return;
+        }
+        if (!QDir(m_directory).rename(QFileInfo(m_repositoryStagingPath).fileName(), id)) {
+            finishRepositoryInstall(false, QStringLiteral("Could not move the plugin into the plugin folder."));
+            return;
+        }
+
+        m_repositoryStagingPath.clear();
+        refresh();
+        m_repositoryInstallStatus = QStringLiteral("Installed “%1”. Review its permissions, then enable it.").arg(id);
+        emit repositoryInstallChanged();
+    });
+    connect(process, &QProcess::errorOccurred, this, [this, process](QProcess::ProcessError error) {
+        if (error != QProcess::FailedToStart || m_repositoryProcess != process)
+            return;
+        m_repositoryProcess = nullptr;
+        process->deleteLater();
+        finishRepositoryInstall(false, QStringLiteral("Could not start Git to clone this repository."));
+    });
+    process->start();
+    return true;
+}
 
 void PluginManager::refresh()
 {
