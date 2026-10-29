@@ -37,6 +37,8 @@
 #include "services/pluginmanager.h"
 #include "services/themeloader.h"
 #include "services/fileoperations.h"
+#include "services/appimageinstaller.h"
+#include "services/desktopintegration.h"
 #include "services/clipboardmanager.h"
 #include "services/draghelper.h"
 #include "models/filesystemmodel.h"
@@ -678,6 +680,10 @@ int main(int argc, char *argv[])
             initialOpenPath = fi.absoluteFilePath();
     }
 
+    const QString defaultConfigDir = QDir::homePath() + QStringLiteral("/.config/Aether");
+    const QString configDir = QDir::cleanPath(
+        qEnvironmentVariable("AETHER_CONFIG_DIR", defaultConfigDir));
+
     // Before QGuiApplication: it may set VK_DRIVER_FILES, which is only safe
     // while this is the only thread.
     RendererChoice renderer;
@@ -704,16 +710,6 @@ int main(int argc, char *argv[])
         std::thread(warmVulkanDriver).detach();
 #endif
 
-    // The first string any Qt process measures costs ~7 ms: fontconfig matches
-    // the family, FreeType loads the face, and the shaper initialises. That
-    // used to land on whichever Text item QML built first (the status bar's
-    // disk label, as it happened). The font database and FreeType are shared
-    // across threads under their own locks - only QFontCache is per-thread -
-    // so doing it on a worker leaves the GUI thread ~1 ms of engine setup.
-    std::thread([] {
-        QFontMetricsF(QFont()).horizontalAdvance(QStringLiteral("0123456789 GB free of"));
-    }).detach();
-
     // One process serves every window. Launching Aether while it runs hands
     // the request to it over a per-uid unix socket: `aether <path>` adds a tab
     // to the window last used (what desktop launchers and `xdg-open` rely on),
@@ -727,9 +723,15 @@ int main(int argc, char *argv[])
     // 0700 fallback), which only this user can write to. It used to be
     // /tmp/Aether-<uid>: any local user could create that first, and every
     // launch would then hand its path to their server and quit.
-    const QString aetherSocketName =
-        QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation)
-        + QStringLiteral("/Aether.sock");
+    QString socketFileName = QStringLiteral("Aether.sock");
+    if (configDir != QDir::cleanPath(defaultConfigDir)) {
+        const QByteArray profileHash = QCryptographicHash::hash(
+            configDir.toUtf8(), QCryptographicHash::Sha1).toHex().left(12);
+        socketFileName = QStringLiteral("Aether-") + QString::fromLatin1(profileHash)
+            + QStringLiteral(".sock");
+    }
+    const QString aetherSocketName = QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation)
+        + QLatin1Char('/') + socketFileName;
     QLocalServer *ipcServer = nullptr;
     bool isPrimary = false;
     {
@@ -766,6 +768,14 @@ int main(int argc, char *argv[])
             isPrimary = ipcServer->isListening();
         }
     }
+
+    // Warm the font cache off the GUI thread while QML is built. Start this
+    // only after the single-instance handoff above: a secondary launch can
+    // return early, and a detached font worker could otherwise race with
+    // QGuiApplication destroying its font database during shutdown.
+    std::thread fontWarmup([] {
+        QFontMetricsF(QFont()).horizontalAdvance(QStringLiteral("0123456789 GB free of"));
+    });
 
     QQuickStyle::setStyle("Basic");
 
@@ -808,9 +818,6 @@ int main(int argc, char *argv[])
     };
 
     // Keep this fork's settings separate from the previously installed app.
-    const QString defaultConfigDir = QDir::homePath()
-        + QStringLiteral("/.config/Aether");
-    const QString configDir = qEnvironmentVariable("AETHER_CONFIG_DIR", defaultConfigDir);
     QDir().mkpath(configDir);
     const QString configPath = configDir + "/config.toml";
 
@@ -868,12 +875,14 @@ int main(int argc, char *argv[])
     // under platform themes that do not forward the portal setting (qt6ct,
     // Kvantum), which is a common Hyprland setup -- so ask the portal directly
     // and fall back to Qt, then to dark.
-    const QString systemDefaultTheme = desktopPrefersLight()
+    const bool systemPrefersLight = desktopPrefersLight();
+    const QString systemDefaultTheme = systemPrefersLight
         ? QStringLiteral("catppuccin-latte")
         : QStringLiteral("catppuccin-mocha");
 
     // Create backend instances
-    ConfigManager *config = new ConfigManager(configPath, &app, themeDirs, systemDefaultTheme);
+    ConfigManager *config = new ConfigManager(configPath, &app, themeDirs,
+                                             systemDefaultTheme, systemPrefersLight);
     mark("ConfigManager loaded");
     app.setFont(resolveUiFont(config->fontFamily()));
     new UiFontGuard(&app, [&]() { return resolveUiFont(config->fontFamily()); });
@@ -910,6 +919,8 @@ int main(int argc, char *argv[])
     });
 
     FileOperations *fileOps = new FileOperations(&app);
+    AppImageInstaller *appImageInstaller = new AppImageInstaller(&app);
+    auto *desktopIntegration = new DesktopIntegration(&app);
     UndoManager *undoManager = new UndoManager(fileOps, &app);
     ClipboardManager *clipboard = new ClipboardManager(&app);
     // DragHelper created after IconProvider below
@@ -929,6 +940,13 @@ int main(int argc, char *argv[])
         bookmarks->setBookmarks(config->bookmarks(), config->bookmarkNames());
         app.setFont(resolveUiFont(config->fontFamily()));
     });
+
+    QDBusConnection::sessionBus().connect(
+        QStringLiteral("org.freedesktop.portal.Desktop"),
+        QStringLiteral("/org/freedesktop/portal/desktop"),
+        QStringLiteral("org.freedesktop.portal.Settings"),
+        QStringLiteral("SettingChanged"), config,
+        SLOT(handleDesktopSettingChanged(QString,QString,QDBusVariant)));
 
     // Connect lastWindowClosed to quit
     QObject::connect(&app, &QGuiApplication::lastWindowClosed, &app, &QGuiApplication::quit);
@@ -953,7 +971,7 @@ int main(int argc, char *argv[])
                      metadataExtractor, &MetadataExtractor::refreshSupport);
 
     QQmlApplicationEngine engine;
-    auto *pluginManager = new PluginManager(fileOps, &app);
+    auto *pluginManager = new PluginManager(fileOps, configDir, &app);
 
     // Aether and Quill are both compiled in. These paths only serve the
     // on-disk fallback copy of the Aether module (see below). No source-tree
@@ -994,6 +1012,8 @@ int main(int argc, char *argv[])
     shared->setContextProperty("theme", theme);
     shared->setContextProperty("bookmarks", bookmarks);
     shared->setContextProperty("fileOps", fileOps);
+    shared->setContextProperty("appImageInstaller", appImageInstaller);
+    shared->setContextProperty("desktopIntegration", desktopIntegration);
     shared->setContextProperty("undoManager", undoManager);
     shared->setContextProperty("clipboard", clipboard);
     shared->setContextProperty("dragHelper", dragHelper);
@@ -1092,6 +1112,10 @@ int main(int argc, char *argv[])
         fsModel->setShowHidden(config->showHidden());
         fsModel->setHiddenLast(config->hiddenLast());
         fsModel->setRootPath(initialPrimaryPath);
+        auto *portalFsModel = new FileSystemModel(w);
+        portalFsModel->setShowHidden(config->showHidden());
+        portalFsModel->setHiddenLast(config->hiddenLast());
+        portalFsModel->setRootPath(QDir::homePath());
         auto *splitFsModel = new FileSystemModel(w);
         splitFsModel->setShowHidden(config->showHidden());
         splitFsModel->setHiddenLast(config->hiddenLast());
@@ -1134,6 +1158,7 @@ int main(int argc, char *argv[])
         context->setContextProperty("tabModel", w->tabModel);
         context->setContextProperty("sessionState", w->sessionState);
         context->setContextProperty("fsModel", fsModel);
+        context->setContextProperty("portalFsModel", portalFsModel);
         context->setContextProperty("splitFsModel", splitFsModel);
         context->setContextProperty("millerParentModel", millerParentModel);
         context->setContextProperty("millerPreviewModel", millerPreviewModel);
@@ -1377,5 +1402,8 @@ int main(int argc, char *argv[])
     if (!initialOpenPath.isEmpty() && isPrimary && restoringSession)
         QTimer::singleShot(0, &app, [&]() { openPathInNewTab(initialOpenPath); });
 
-    return app.exec();
+    const int exitCode = app.exec();
+    if (fontWarmup.joinable())
+        fontWarmup.join();
+    return exitCode;
 }

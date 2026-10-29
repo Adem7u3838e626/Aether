@@ -29,6 +29,7 @@ Item {
     signal openWithRequested(string path, string desktopFile)
     signal setDefaultAppRequested(string mimeType, string desktopFile)
     signal chooseAppRequested(string path, string mimeType)
+    signal installAppImageRequested(string path)
     signal openInNewTabRequested(string path)
     signal cutRequested(var paths)
     signal copyRequested(var paths)
@@ -691,6 +692,9 @@ Item {
                 items.push({ text: "Run", shortcut: "", action: "run", icon: "Play" })
                 items.push({ text: "Run in Terminal", shortcut: "", action: "run_terminal", icon: "Terminal" })
             }
+            if (!targetIsDir && !isTrashView && !remoteContext
+                    && effectivePaths.length === 1 && appImageInstaller.isAppImage(targetPath))
+                items.push({ text: "Install App", shortcut: "", action: "install_appimage", icon: "Download" })
             if (!isTrashView && !remoteContext) {
                 var custom = customActionItems(typeof mime === "string" ? mime : "")
                 if (custom.length > 0) {
@@ -830,6 +834,7 @@ Item {
         case "terminal": openInTerminalRequested(effectiveDir); break
         case "run": fileOps.runExecutable(targetPath, false); break
         case "run_terminal": fileOps.runExecutable(targetPath, true); break
+        case "install_appimage": installAppImageRequested(targetPath); break
         case "newfolder": newFolderRequested(effectiveDir); break
         case "newfile": newFileRequested(effectiveDir); break
         case "properties": propertiesRequested(targetPath); break

@@ -5,6 +5,8 @@ set(AETHER_SOURCES
     services/themeloader.cpp
     services/clipboardmanager.cpp
     services/fileoperations.cpp
+    services/appimageinstaller.cpp
+    services/desktopintegration.cpp
     services/xdgtrash.cpp
     services/giotransferworker.cpp
     services/draghelper.cpp
@@ -115,6 +117,7 @@ list(APPEND aether_qml_module_args
         qml/components/ConfirmDialog.qml
         qml/components/RemoteConnectDialog.qml
         qml/components/CloudDriveDialog.qml
+        qml/components/InstallAppImageDialog.qml
         qml/components/PreviewLoader.qml
         qml/components/QuickPreview.qml
         qml/components/CsvTable.qml
@@ -286,3 +289,7 @@ install(DIRECTORY "${CMAKE_SOURCE_DIR}/dist/icons/hicolor/"
     FILES_MATCHING PATTERN "*.png")
 install(FILES "${CMAKE_SOURCE_DIR}/dist/io.github.adem7u3838e626.Aether.metainfo.xml"
     DESTINATION share/metainfo)
+install(FILES "${CMAKE_SOURCE_DIR}/dist/aether.portal"
+    DESTINATION share/xdg-desktop-portal/portals)
+install(FILES "${CMAKE_SOURCE_DIR}/dist/org.freedesktop.impl.portal.desktop.aether.service"
+    DESTINATION share/dbus-1/services)

@@ -3,6 +3,7 @@
 #include <QAbstractListModel>
 #include <QList>
 #include <QTimer>
+#include <QSet>
 
 typedef struct _GMount GMount;
 typedef struct _GVolume GVolume;
@@ -34,6 +35,7 @@ class QDBusMessage;
 class DeviceModel : public QAbstractListModel
 {
     Q_OBJECT
+    Q_PROPERTY(bool autoMountRemovable READ autoMountRemovable WRITE setAutoMountRemovable NOTIFY autoMountRemovableChanged)
 
 public:
     enum Roles {
@@ -57,6 +59,9 @@ public:
 
     Q_INVOKABLE void unmount(int index);
     Q_INVOKABLE void mount(int index);
+    Q_INVOKABLE void rename(int index, const QString &name);
+    bool autoMountRemovable() const;
+    void setAutoMountRemovable(bool enabled);
 
 public slots:
     void refresh();
@@ -66,6 +71,7 @@ public slots:
 signals:
     void deviceMounted(const QString &mountPoint);
     void mountError(const QString &message);
+    void autoMountRemovableChanged();
 
 private:
     void applyUDisksReply(const QDBusMessage &reply);
@@ -78,4 +84,7 @@ private:
     GVolumeMonitor *m_volumeMonitor = nullptr;
     quint64 m_refreshGeneration = 0;
     QTimer m_refreshTimer;
+    QSet<QString> m_seenDevicePaths;
+    bool m_initialDeviceScanDone = false;
+    bool m_autoMountRemovable = false;
 };

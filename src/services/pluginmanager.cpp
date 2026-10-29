@@ -31,6 +31,41 @@ QString safeIconName(const QString &name)
     static const QRegularExpression validName(QStringLiteral("^[A-Za-z][A-Za-z0-9]*$"));
     return validName.match(name).hasMatch() ? name : QString();
 }
+
+bool copyDirectoryContents(const QString &sourcePath, const QString &destinationPath)
+{
+    QDir source(sourcePath);
+    if (!source.exists())
+        return false;
+    if (QDir::cleanPath(source.absolutePath())
+        == QDir::cleanPath(QFileInfo(destinationPath).absoluteFilePath()))
+        return true;
+    if (!QDir().mkpath(destinationPath))
+        return false;
+    bool success = true;
+    const QFileInfoList entries = source.entryInfoList(
+        QDir::NoDotAndDotDot | QDir::AllEntries | QDir::Hidden | QDir::System);
+    for (const QFileInfo &entry : entries) {
+        const QString destination = QDir(destinationPath).filePath(entry.fileName());
+        if (entry.isDir() && !entry.isSymLink()) {
+            if (!copyDirectoryContents(entry.absoluteFilePath(), destination))
+                success = false;
+        } else if (!QFileInfo::exists(destination)
+                   && !QFile::copy(entry.absoluteFilePath(), destination)) {
+            success = false;
+        }
+    }
+    return success;
+}
+
+void copyLegacyFile(const QString &sourcePath, const QString &destinationPath)
+{
+    if (!QFileInfo::exists(destinationPath) && QFileInfo::exists(sourcePath)) {
+        QDir().mkpath(QFileInfo(destinationPath).absolutePath());
+        QFile::copy(sourcePath, destinationPath);
+    }
+}
+
 QString pluginIdFromLua(lua_State *state) { return QString::fromUtf8(lua_tostring(state, lua_upvalueindex(2))); }
 PluginManager *managerFromLua(lua_State *state) { return static_cast<PluginManager *>(lua_touserdata(state, lua_upvalueindex(1))); }
 int pluginLuaLog(lua_State *state)
@@ -319,17 +354,23 @@ int pluginLuaOn(lua_State *state)
 }
 }
 
-PluginManager::PluginManager(FileOperations *fileOperations, QObject *parent)
+PluginManager::PluginManager(FileOperations *fileOperations, const QString &configDirectory,
+                             QObject *parent)
     : QAbstractListModel(parent), m_fileOperations(fileOperations)
 {
-    m_directory = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation)
-        + QStringLiteral("/plugins");
-    m_stateFile = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation)
-        + QStringLiteral("/plugins-enabled.json");
-    m_settingsFile = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation)
-        + QStringLiteral("/plugin-settings.json");
-    m_permissionsFile = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation)
-        + QStringLiteral("/plugin-permissions.json");
+    const QString legacyConfigDirectory = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+    m_directory = QDir(configDirectory).filePath(QStringLiteral("plugins"));
+    m_stateFile = QDir(configDirectory).filePath(QStringLiteral("plugins-enabled.json"));
+    m_settingsFile = QDir(configDirectory).filePath(QStringLiteral("plugin-settings.json"));
+    m_permissionsFile = QDir(configDirectory).filePath(QStringLiteral("plugin-permissions.json"));
+
+    // Move the user's existing plugin setup forward from Qt's previous
+    // per-application config location without overwriting anything already
+    // present in the new Aether config directory.
+    copyDirectoryContents(QDir(legacyConfigDirectory).filePath(QStringLiteral("plugins")), m_directory);
+    copyLegacyFile(QDir(legacyConfigDirectory).filePath(QStringLiteral("plugins-enabled.json")), m_stateFile);
+    copyLegacyFile(QDir(legacyConfigDirectory).filePath(QStringLiteral("plugin-settings.json")), m_settingsFile);
+    copyLegacyFile(QDir(legacyConfigDirectory).filePath(QStringLiteral("plugin-permissions.json")), m_permissionsFile);
     QFile settings(m_settingsFile);
     if (settings.open(QIODevice::ReadOnly)) m_settingValues = QJsonDocument::fromJson(settings.readAll()).object();
     QFile permissions(m_permissionsFile);

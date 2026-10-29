@@ -19,6 +19,7 @@
 #include <QRegularExpression>
 #include <QSet>
 #include <QStorageInfo>
+#include <QSettings>
 #include <QUrl>
 #undef signals
 #include <gio/gio.h>
@@ -37,6 +38,8 @@ static const QStringList kVirtualTypes = {
 DeviceModel::DeviceModel(QObject *parent, bool deferInitialRefresh)
     : QAbstractListModel(parent)
 {
+    QSettings settings;
+    m_autoMountRemovable = settings.value(QStringLiteral("devices/autoMountRemovable"), false).toBool();
     m_refreshTimer.setSingleShot(true);
     m_refreshTimer.setInterval(600);
     connect(&m_refreshTimer, &QTimer::timeout, this, &DeviceModel::refreshAsync);
@@ -440,6 +443,7 @@ void DeviceModel::refreshAsync()
 
 void DeviceModel::applyUDisksReply(const QDBusMessage &reply)
 {
+    const QSet<QString> previousPaths = m_seenDevicePaths;
     beginResetModel();
     clearDevices();
 
@@ -538,6 +542,11 @@ void DeviceModel::applyUDisksReply(const QDBusMessage &reply)
             name = mountPoint.section(QLatin1Char('/'), -1);
         else
             name = b.device.section(QLatin1Char('/'), -1);
+
+        QSettings settings;
+        const QString savedName = settings.value(QStringLiteral("devices/names/") + b.device).toString().trimmed();
+        if (!savedName.isEmpty())
+            name = savedName;
 
         qint64 total = 0;
         qint64 free = 0;
@@ -767,7 +776,60 @@ void DeviceModel::applyUDisksReply(const QDBusMessage &reply)
                   return a.devicePath < b.devicePath;
               });
 
+    m_seenDevicePaths.clear();
+    for (int i = 0; i < m_devices.size(); ++i) {
+        const DeviceEntry &device = m_devices.at(i);
+        m_seenDevicePaths.insert(device.devicePath);
+        if (m_initialDeviceScanDone && m_autoMountRemovable && device.removable
+            && !device.mounted && !previousPaths.contains(device.devicePath))
+            QTimer::singleShot(0, this, [this, path = device.devicePath]() {
+                for (int row = 0; row < m_devices.size(); ++row) {
+                    if (m_devices.at(row).devicePath == path && !m_devices.at(row).mounted) {
+                        mount(row);
+                        break;
+                    }
+                }
+            });
+    }
+    m_initialDeviceScanDone = true;
+
     endResetModel();
+}
+
+bool DeviceModel::autoMountRemovable() const
+{
+    return m_autoMountRemovable;
+}
+
+void DeviceModel::setAutoMountRemovable(bool enabled)
+{
+    if (m_autoMountRemovable == enabled)
+        return;
+    m_autoMountRemovable = enabled;
+    QSettings().setValue(QStringLiteral("devices/autoMountRemovable"), enabled);
+    emit autoMountRemovableChanged();
+}
+
+void DeviceModel::rename(int index, const QString &name)
+{
+    if (index < 0 || index >= m_devices.size())
+        return;
+    const QString cleaned = name.trimmed();
+    const QString path = m_devices.at(index).devicePath;
+    if (path.isEmpty())
+        return;
+    QSettings settings;
+    const QString key = QStringLiteral("devices/names/") + path;
+    if (cleaned.isEmpty())
+        settings.remove(key);
+    else
+        settings.setValue(key, cleaned);
+    if (cleaned.isEmpty()) {
+        scheduleRefresh();
+        return;
+    }
+    m_devices[index].deviceName = cleaned;
+    emit dataChanged(this->index(index), this->index(index), {DeviceNameRole});
 }
 
 // Map a /dev/<basename> path to its UDisks2 object path. D-Bus object paths

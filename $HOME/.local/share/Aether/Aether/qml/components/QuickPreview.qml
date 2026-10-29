@@ -1,0 +1,1329 @@
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import Aether
+
+Item {
+    id: root
+    Accessible.role: Accessible.Pane
+    Accessible.name: "Quick preview" + (root.filePath ? ": " + root.filePath.split("/").pop() : "")
+
+    property string filePath: ""
+    property var directoryFiles: []
+    property bool active: false
+    property var fileModel: fsModel
+
+    property var fileProps: ({})
+    readonly property var textPreview: previewLoader.textPreview
+    readonly property var directoryPreview: previewLoader.directoryPreview
+    readonly property var pdfPreview: previewLoader.pdfPreview
+    readonly property var fileMetadata: previewLoader.fileMetadata
+    // Fonts stay local: QFontDatabase is GUI-thread-only.
+    property var fontPreview: ({ family: "", styleName: "", weight: 400, italic: false, valid: false, error: "" })
+    property string metadataHint: ""
+    property int pdfPageIndex: 0
+
+    // The page we are navigating away from, held on screen until the
+    // incoming one is Ready. An Image drops its texture the moment source
+    // changes, so without this every page turn flashes empty -- even on a
+    // cache hit, which still resolves a frame or two later because the
+    // provider is asynchronous.
+    property string pdfHoldSource: ""
+    property real pdfWheelAccumulator: 0
+    property bool closing: false
+    readonly property bool previewLoading: previewLoader.loading
+
+    signal closed()
+    signal openRequested(string path, bool isDirectory)
+    signal unlockArchiveRequested(string filePath, bool retry)
+    signal unlockSucceeded()
+
+    // Set while a password the user just typed is being proved by a reload.
+    property bool _unlockPending: false
+
+    // The archive this preview unlocked, if any. The password lives only as
+    // long as the preview showing it, so moving to another file or closing
+    // the overlay forgets it, the way Ark and File Roller do.
+    property string _unlockedPath: ""
+
+    function _forgetUnlockedArchive() {
+        if (root._unlockedPath === "")
+            return
+        fileOps.clearArchivePassword(root._unlockedPath)
+        root._unlockedPath = ""
+    }
+
+    function reloadAfterUnlock() {
+        root._unlockPending = true
+        root.refreshPreviewData()
+    }
+
+    // The preview is the only thing that can tell us a password was wrong on
+    // this path: nothing extracts, so no operation reports back. If the reload
+    // still comes back locked, ask again and say so.
+    onDirectoryPreviewChanged: {
+        if (!root._unlockPending)
+            return
+        if (directoryPreview.requiresPassword === true) {
+            root._unlockPending = false
+            fileOps.clearArchivePassword(root.filePath)
+            root.unlockArchiveRequested(root.filePath, true)
+        } else if ((directoryPreview.entries || []).length > 0) {
+            root._unlockPending = false
+            root._unlockedPath = root.filePath
+            root.unlockSucceeded()
+        }
+    }
+
+    readonly property string fileName: {
+        if (fileProps.name)
+            return fileProps.name
+        if (filePath === "")
+            return ""
+        var idx = filePath.lastIndexOf("/")
+        return idx >= 0 ? filePath.substring(idx + 1) : filePath
+    }
+
+    readonly property string fileExtension: {
+        var name = fileName
+        var dot = name.lastIndexOf(".")
+        return dot >= 0 ? name.substring(dot + 1).toLowerCase() : ""
+    }
+
+    readonly property bool isDirectory: fileProps.isDir || false
+    readonly property bool isArchive: !isDirectory && fileOps.isArchive(filePath)
+    readonly property bool isTrashUri: filePath.startsWith("trash:///")
+    readonly property bool isRemoteUri: fileOps.isRemotePath(filePath)
+    readonly property string _mime: fileProps.mimeType || ""
+    readonly property bool isImage: !isRemoteUri && !isDirectory && _mime.startsWith("image/")
+    // SVGs need explicit routing through the thumbnail provider (QSvgRenderer
+    // path). Qt's default Image handler treats viewBox-only SVGs as 0×0.
+    readonly property bool isSvg: isImage && _mime === "image/svg+xml"
+    readonly property bool isVideo: !isRemoteUri && !isDirectory && _mime.startsWith("video/")
+    readonly property bool isAudio: !isRemoteUri && !isDirectory && _mime.startsWith("audio/")
+    readonly property bool isPdf: !isRemoteUri && !isDirectory && _mime === "application/pdf"
+    readonly property bool isFont: {
+        if (isRemoteUri || isDirectory)
+            return false
+        if (_mime.startsWith("font/") || _mime === "application/x-font-ttf"
+            || _mime === "application/x-font-otf" || _mime === "application/vnd.ms-fontobject")
+            return true
+        return ["ttf", "otf", "woff", "woff2"].indexOf(fileExtension) >= 0
+    }
+    readonly property bool isText: {
+        if (isRemoteUri || isDirectory || isPdf || isImage || isVideo || isAudio || isArchive || isFont)
+            return false
+        if (_mime.startsWith("text/"))
+            return true
+        var textMimes = [
+            "application/json", "application/xml", "application/x-yaml",
+            "application/toml", "application/x-shellscript",
+            "application/javascript", "application/typescript",
+            "application/x-tex", "application/x-makefile",
+            "application/x-desktop", "application/x-ruby",
+            "application/x-perl", "application/x-python"
+        ]
+        if (textMimes.indexOf(_mime) >= 0)
+            return true
+        // Fallback: extensionless files and known text extensions not covered by MIME
+        if (fileExtension === "")
+            return true
+        var textExt = ["txt", "md", "json", "yaml", "yml", "toml", "ini", "cfg", "conf",
+                       "sh", "bash", "zsh", "fish", "py", "js", "ts", "tsx", "jsx",
+                       "css", "html", "htm", "xml", "c", "cpp", "h", "hpp", "rs",
+                       "go", "java", "tex", "rb", "lua", "vim", "log", "diff",
+                       "patch", "cmake", "qml", "mk", "desktop"]
+        return textExt.indexOf(fileExtension) >= 0
+    }
+    // The service decides what it rendered: md2html missing or failing falls
+    // back to bat, and highlighted source must keep the monospace no-wrap
+    // treatment rather than be laid out as a document on the strength of an
+    // extension alone.
+    readonly property bool isMarkdown: textPreview.markdown === true
+    readonly property bool isTable: textPreview.table !== undefined
+    // A document's own folder, for the relative image paths a README is
+    // written against ("docs/screenshots/grid-view.png"). Without it Qt
+    // resolves them against the qrc: path this component was loaded from and
+    // draws a broken-image glyph for every one. Each segment is encoded, so a
+    // folder with a space or a '#' in its name still resolves.
+    readonly property url markdownBaseUrl: {
+        if (!root.isMarkdown || root.filePath === "")
+            return ""
+        var dir = root.filePath.substring(0, root.filePath.lastIndexOf("/"))
+        return "file://" + dir.split("/").map(encodeURIComponent).join("/") + "/"
+    }
+    // Qt draws a rich-text image at its native size, so the screenshots a
+    // README points at (2500 px wide is normal) run far outside the pane and
+    // push the text off with them. A pixel max-width shrinks anything wider
+    // than the pane and scales the height with it, while a badge or a logo
+    // that already fits is left at the size it was drawn for.
+    function fitMarkdownImages(html, limit) {
+        return html.replace(/<img\b/g,
+                            '<img style="max-width:' + Math.max(64, Math.floor(limit)) + 'px"')
+    }
+
+    // Which loader the worker thread should run. Mirrors the is* properties
+    // below; "" means metadata only (images, video, audio, fonts).
+    readonly property string previewKind: {
+        if (isRemoteUri) return ""
+        if (isDirectory) return "directory"
+        if (isArchive) return "archive"
+        if (isPdf) return "pdf"
+        if (isText) return "text"
+        return ""
+    }
+
+    PreviewLoader {
+        id: previewLoader
+        requester: "quick"
+        path: root.isRemoteUri ? "" : root.filePath
+        kind: root.previewKind
+        onPdfPageCountChanged: {
+            if (root.pdfPageIndex >= (pdfPreview.pageCount || 0))
+                root.pdfPageIndex = 0
+        }
+    }
+
+    readonly property bool pdfPreviewAvailable: previewService.pdfPreviewAvailable
+    readonly property bool videoPreviewAvailable: runtimeFeatures.ffmpegAvailable
+    readonly property bool textHighlightAvailable: runtimeFeatures.batAvailable
+    readonly property string pdfImageSource: {
+        if (!isPdf || !pdfPreview.localPath || pdfPreview.error !== "")
+            return ""
+        return "image://pdfpreview/" + encodeURIComponent(pdfPreview.localPath)
+            + "?page=" + pdfPageIndex
+    }
+    readonly property string pdfPageLabel: {
+        if (!isPdf || pdfPreview.pageCount <= 0)
+            return ""
+        return "Page " + (pdfPageIndex + 1) + " of " + pdfPreview.pageCount
+    }
+    readonly property bool hasVisualPreview: isImage || (isVideo && videoPreviewAvailable)
+    readonly property string visualSource: {
+        if (!hasVisualPreview || filePath === "")
+            return ""
+        if (isVideo || isTrashUri || isSvg)
+            return "image://thumbnail/" + filePath
+        return "file://" + filePath
+    }
+    readonly property string visualStatusText: {
+        if (isVideo)
+            return "Video poster preview"
+        if (isImage)
+            return "Image preview"
+        return "Preview"
+    }
+    readonly property string detailKind: {
+        if (isDirectory)
+            return "Folder"
+        if (isArchive)
+            return "Archive"
+        if (isAudio)
+            return "Audio"
+        if (isVideo)
+            return "Video"
+        if (fileProps.mimeDescription)
+            return fileProps.mimeDescription
+        if (fileExtension !== "")
+            return fileExtension.toUpperCase() + " file"
+        return "File"
+    }
+    readonly property string sidebarPathLabel: fileProps.originalPath || fileProps.parentDir || ""
+
+    visible: active || closing
+    focus: visible
+
+    component InfoBlock: Column {
+        property string label: ""
+        property string value: ""
+        property bool visibleWhenEmpty: false
+        width: parent.width
+        spacing: 4
+        visible: visibleWhenEmpty || value !== ""
+
+        Text {
+            width: parent.width
+            text: parent.label
+            color: Theme.muted
+            font.pointSize: Theme.fontSmall
+            font.weight: Font.DemiBold
+        }
+
+        Text {
+            width: parent.width
+            text: parent.value
+            color: Theme.text
+            font.pointSize: Theme.fontNormal
+            wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+        }
+    }
+
+    function closePreview() {
+        if (!active)
+            return
+
+        active = false
+    }
+
+    function currentIndex() {
+        if (directoryFiles.length === 0) return -1
+        for (var i = 0; i < directoryFiles.length; i++) {
+            if (directoryFiles[i] === filePath) return i
+        }
+        return -1
+    }
+
+    function cycleFile(direction) {
+        var files = directoryFiles
+        if (files.length === 0) return
+        var idx = currentIndex()
+        if (idx < 0) idx = 0
+        idx = (idx + direction + files.length) % files.length
+        filePath = files[idx]
+    }
+
+    function refreshPreviewData() {
+        if (!active || filePath === "") {
+            previewLoader.stop()
+            return
+        }
+
+        // Cheap in-memory model lookup, so the header (name, size, icon)
+        // repaints immediately while the body is still being read.
+        if (fileModel && fileModel.fileProperties)
+            fileProps = fileModel.fileProperties(filePath)
+        else
+            fileProps = ({})
+
+        metadataHint = isRemoteUri
+            ? "" : metadataExtractor.missingDepsHint(fileProps.mimeType || "")
+
+        fontPreview = (isFont && !isRemoteUri)
+            ? previewService.loadFontPreview(filePath)
+            : ({ family: "", styleName: "", weight: 400, italic: false, valid: false, error: "" })
+
+        // Assigned, not bound: archivePassword() is a plain invokable with no
+        // NOTIFY, so a binding would never re-evaluate after the user unlocks
+        // the archive. reloadAfterUnlock() routes back through here.
+        previewLoader.password = isArchive ? fileOps.archivePassword(filePath) : ""
+        previewLoader.reload()
+    }
+
+    onActiveChanged: {
+        if (active) {
+            closeAnim.stop()
+            closing = false
+            overlay.opacity = 0
+            card.opacity = 0
+            card.scale = 0.88
+            card.yOffset = -8
+            refreshPreviewData()
+            openAnim.start()
+            Qt.callLater(function() { root.forceActiveFocus() })
+        } else if (visible) {
+            root._forgetUnlockedArchive()
+            // Closing: stop any in-flight worker from doing pointless work
+            // and from repainting a panel the user is no longer looking at.
+            previewLoader.stop()
+            openAnim.stop()
+            closing = true
+            closeAnim.start()
+        }
+    }
+    onFilePathChanged: {
+        // Moving to another file ends the unlocked archive's life.
+        if (root._unlockedPath !== "" && root._unlockedPath !== root.filePath)
+            root._forgetUnlockedArchive()
+        pdfHoldSource = ""
+        pdfPageIndex = 0
+        pdfWheelAccumulator = 0
+        refreshPreviewData()
+    }
+    onFileModelChanged: {
+        pdfWheelAccumulator = 0
+        refreshPreviewData()
+    }
+
+    function changePdfPage(delta) {
+        if (!isPdf || pdfPreview.pageCount <= 0)
+            return
+        var next = Math.max(0, Math.min(pdfPreview.pageCount - 1, pdfPageIndex + delta))
+        if (next === pdfPageIndex)
+            return
+        pdfHoldSource = pdfImageSource
+        pdfPageIndex = next
+    }
+
+    function handlePdfWheel(wheel) {
+        if (!isPdf || pdfPreview.pageCount <= 1)
+            return
+
+        var delta = 0
+        if (wheel.angleDelta && wheel.angleDelta.y !== 0)
+            delta = wheel.angleDelta.y
+        else if (wheel.pixelDelta && wheel.pixelDelta.y !== 0)
+            delta = wheel.pixelDelta.y * 3
+
+        if (delta === 0)
+            return
+
+        pdfWheelAccumulator += delta
+        while (pdfWheelAccumulator >= 120) {
+            changePdfPage(-1)
+            pdfWheelAccumulator -= 120
+        }
+        while (pdfWheelAccumulator <= -120) {
+            changePdfPage(1)
+            pdfWheelAccumulator += 120
+        }
+
+        wheel.accepted = true
+    }
+
+    Keys.onEscapePressed: (event) => {
+        event.accepted = true
+        closePreview()
+    }
+    Keys.onLeftPressed: (event) => {
+        event.accepted = true
+        cycleFile(-1)
+    }
+    Keys.onRightPressed: (event) => {
+        event.accepted = true
+        cycleFile(1)
+    }
+    Keys.onUpPressed: (event) => {
+        if (!isPdf)
+            return
+        event.accepted = true
+        changePdfPage(-1)
+    }
+    Keys.onDownPressed: (event) => {
+        if (!isPdf)
+            return
+        event.accepted = true
+        changePdfPage(1)
+    }
+    Keys.onPressed: (event) => {
+        if (!isPdf)
+            return
+        if (event.key === Qt.Key_PageUp) {
+            event.accepted = true
+            changePdfPage(-1)
+        } else if (event.key === Qt.Key_PageDown) {
+            event.accepted = true
+            changePdfPage(1)
+        }
+    }
+    Keys.onSpacePressed: (event) => {
+        event.accepted = true
+        closePreview()
+    }
+    Keys.onReturnPressed: (event) => {
+        event.accepted = true
+        root.openRequested(filePath, isDirectory)
+        closePreview()
+    }
+
+    ParallelAnimation {
+        id: openAnim
+
+        NumberAnimation {
+            target: overlay
+            property: "opacity"
+            from: 0
+            to: 1
+            duration: Theme.animDurationFast
+            easing.type: Theme.animEasingEnter; easing.bezierCurve: Theme.animBezierCurve
+        }
+
+        NumberAnimation {
+            target: card
+            property: "opacity"
+            from: 0
+            to: 1
+            duration: Theme.animDurationFast
+            easing.type: Theme.animEasingEnter; easing.bezierCurve: Theme.animBezierCurve
+        }
+
+        NumberAnimation {
+            target: card
+            property: "scale"
+            from: 0.88
+            to: 1
+            duration: Theme.animDurationSlow
+            easing.type: Easing.OutBack
+            easing.overshoot: 0.8
+        }
+
+        NumberAnimation {
+            target: card
+            property: "yOffset"
+            from: -8
+            to: 0
+            duration: Theme.animDuration
+            easing.type: Theme.animEasingEnter; easing.bezierCurve: Theme.animBezierCurve
+        }
+    }
+
+    SequentialAnimation {
+        id: closeAnim
+
+        ParallelAnimation {
+            NumberAnimation {
+                target: overlay
+                property: "opacity"
+                to: 0
+                duration: Theme.animDurationFast
+                easing.type: Theme.animEasingExit; easing.bezierCurve: Theme.animBezierCurve
+            }
+
+            NumberAnimation {
+                target: card
+                property: "opacity"
+                to: 0
+                duration: Theme.animDurationFast
+                easing.type: Theme.animEasingExit; easing.bezierCurve: Theme.animBezierCurve
+            }
+
+            NumberAnimation {
+                target: card
+                property: "scale"
+                to: 0.92
+                duration: Theme.animDurationFast
+                easing.type: Theme.animEasingExit; easing.bezierCurve: Theme.animBezierCurve
+            }
+
+            NumberAnimation {
+                target: card
+                property: "yOffset"
+                to: -4
+                duration: Theme.animDurationFast
+                easing.type: Theme.animEasingExit; easing.bezierCurve: Theme.animBezierCurve
+            }
+        }
+
+        ScriptAction {
+            script: {
+                root.closing = false
+                root.closed()
+            }
+        }
+    }
+
+    Rectangle {
+        id: overlay
+        anchors.fill: parent
+        color: Qt.rgba(0.03, 0.04, 0.05, 0.78)
+        opacity: 0
+
+        MouseArea {
+            anchors.fill: parent
+            onClicked: root.closePreview()
+        }
+    }
+
+    Rectangle {
+        id: card
+        anchors.centerIn: parent
+        width: Math.min(parent.width * 0.9, 1080)
+        height: Math.min(parent.height * 0.88, 760)
+        opacity: 0
+        scale: 0.88
+        transformOrigin: Item.Center
+        radius: Theme.radiusLarge
+        color: Qt.rgba(Theme.mantle.r, Theme.mantle.g, Theme.mantle.b, 0.98)
+        border.width: 1
+        border.color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.12)
+
+        property real yOffset: 0
+        transform: Translate {
+            y: card.yOffset
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            onClicked: function() {}
+        }
+
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 18
+            spacing: 14
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 12
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 4
+
+                    Text {
+                        Layout.fillWidth: true
+                        textFormat: Text.PlainText
+                        text: root.fileName
+                        color: Theme.text
+                        font.pointSize: Theme.fontLarge + 2
+                        font.bold: true
+                        elide: Text.ElideMiddle
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: root.detailKind
+                            + (root.directoryFiles.length > 1
+                                ? "  ·  " + (root.currentIndex() + 1) + " of " + root.directoryFiles.length
+                                : "")
+                            + (root.isPdf && root.pdfPageLabel !== ""
+                                ? "  ·  " + root.pdfPageLabel
+                                : "")
+                        color: Theme.subtext
+                        font.pointSize: Theme.fontNormal
+                        elide: Text.ElideRight
+                    }
+                }
+
+                Row {
+                    spacing: 8
+                    visible: root.isPdf && root.pdfPreview.pageCount > 1
+
+                    Rectangle {
+                        width: 34
+                        height: 34
+                        radius: 17
+                        enabled: root.pdfPageIndex > 0
+                        opacity: enabled ? 1 : 0.45
+                        color: pdfPrevMouse.containsMouse
+                            ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.16)
+                            : Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.08)
+
+                        IconChevronUp {
+                            anchors.centerIn: parent
+                            size: 16
+                            color: Theme.text
+                        }
+
+                        MouseArea {
+                            id: pdfPrevMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            enabled: parent.enabled
+                            onClicked: root.changePdfPage(-1)
+                        }
+                    }
+
+                    Rectangle {
+                        width: 34
+                        height: 34
+                        radius: 17
+                        enabled: root.pdfPageIndex < root.pdfPreview.pageCount - 1
+                        opacity: enabled ? 1 : 0.45
+                        color: pdfNextMouse.containsMouse
+                            ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.16)
+                            : Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.08)
+
+                        IconChevronDown {
+                            anchors.centerIn: parent
+                            size: 16
+                            color: Theme.text
+                        }
+
+                        MouseArea {
+                            id: pdfNextMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            enabled: parent.enabled
+                            onClicked: root.changePdfPage(1)
+                        }
+                    }
+                }
+
+                Row {
+                    spacing: 8
+                    visible: root.directoryFiles.length > 1
+
+                    Rectangle {
+                        width: 34
+                        height: 34
+                        radius: 17
+                        color: prevMouse.containsMouse
+                            ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.16)
+                            : Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.08)
+
+                        IconChevronLeft {
+                            anchors.centerIn: parent
+                            size: 16
+                            color: Theme.text
+                        }
+
+                        MouseArea {
+                            id: prevMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            onClicked: root.cycleFile(-1)
+                        }
+                    }
+
+                    Rectangle {
+                        width: 34
+                        height: 34
+                        radius: 17
+                        color: nextMouse.containsMouse
+                            ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.16)
+                            : Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.08)
+
+                        IconChevronRight {
+                            anchors.centerIn: parent
+                            size: 16
+                            color: Theme.text
+                        }
+
+                        MouseArea {
+                            id: nextMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            onClicked: root.cycleFile(1)
+                        }
+                    }
+                }
+
+                Rectangle {
+                    width: 34
+                    height: 34
+                    radius: 17
+                    color: closeMouse.containsMouse
+                        ? Qt.rgba(Theme.error.r, Theme.error.g, Theme.error.b, 0.18)
+                        : Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.08)
+
+                    IconX {
+                        anchors.centerIn: parent
+                        size: 16
+                        color: Theme.error
+                    }
+
+                    MouseArea {
+                        id: closeMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onClicked: root.closePreview()
+                    }
+                }
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                height: 1
+                color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.1)
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                spacing: 16
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    radius: Theme.radiusMedium
+                    color: Qt.rgba(Theme.base.r, Theme.base.g, Theme.base.b, 0.52)
+                    border.width: 1
+                    border.color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.08)
+
+                    Item {
+                        anchors.fill: parent
+                        anchors.margins: 12
+
+                        Image {
+                            id: visualPreview
+                            anchors.fill: parent
+                            visible: root.hasVisualPreview
+                            source: root.visualSource
+                            sourceSize: Qt.size(width, height)
+                            fillMode: Image.PreserveAspectFit
+                            asynchronous: true
+                            smooth: true
+                        }
+
+                        // Outgoing page, drawn underneath while the next one
+                        // loads. Cleared as soon as pdfPreviewImage is Ready.
+                        Image {
+                            id: pdfHoldImage
+                            anchors.fill: parent
+                            visible: root.pdfHoldSource !== ""
+                                && pdfPreviewImage.status !== Image.Ready
+                            source: root.pdfHoldSource
+                            sourceSize: pdfPreviewImage.sourceSize
+                            fillMode: Image.PreserveAspectFit
+                            asynchronous: true
+                            smooth: true
+                        }
+
+                        Image {
+                            id: pdfPreviewImage
+                            anchors.fill: parent
+                            visible: root.isPdf && root.pdfPreviewAvailable && root.pdfPreview.localPath !== "" && root.pdfPreview.error === ""
+                            source: root.pdfImageSource
+                            sourceSize: Qt.size(width, height)
+                            fillMode: Image.PreserveAspectFit
+                            asynchronous: true
+                            smooth: true
+                            onStatusChanged: {
+                                if (status === Image.Ready || status === Image.Error)
+                                    root.pdfHoldSource = ""
+                            }
+                        }
+
+                        // Warm the neighbouring pages into Qt's pixmap cache
+                        // so flipping is a cache hit instead of another
+                        // pdftoppm run. sourceSize must match pdfPreviewImage
+                        // exactly -- it is part of the cache key, and a
+                        // mismatch silently renders everything twice.
+                        Repeater {
+                            model: (root.isPdf && root.pdfPreviewAvailable
+                                    && root.pdfPreview.localPath !== ""
+                                    && root.pdfPreview.error === "") ? [1, -1] : []
+                            Image {
+                                visible: false
+                                asynchronous: true
+                                sourceSize: Qt.size(pdfPreviewImage.width, pdfPreviewImage.height)
+                                source: {
+                                    var page = root.pdfPageIndex + modelData
+                                    if (page < 0 || page >= (root.pdfPreview.pageCount || 0))
+                                        return ""
+                                    return "image://pdfpreview/"
+                                        + encodeURIComponent(root.pdfPreview.localPath)
+                                        + "?page=" + page
+                                }
+                            }
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            visible: root.isPdf && root.pdfPreviewAvailable && root.pdfPreview.localPath !== "" && root.pdfPreview.error === ""
+                            acceptedButtons: Qt.NoButton
+                            onWheel: (wheel) => root.handlePdfWheel(wheel)
+                        }
+
+                        Column {
+                            anchors.centerIn: parent
+                            spacing: 10
+                            visible: (root.hasVisualPreview && visualPreview.status === Image.Error)
+                                || (root.isPdf && root.pdfPreviewAvailable && root.pdfPreview.localPath !== "" && pdfPreviewImage.status === Image.Error)
+
+                            Image {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                width: 64
+                                height: 64
+                                source: "image://icon/" + (root.fileProps.iconName || (root.isPdf ? "application-pdf" : "image-x-generic")) + "?theme=" + config.iconTheme
+                                sourceSize: Qt.size(width, height)
+                                fillMode: Image.PreserveAspectFit
+                            }
+
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: root.isPdf ? "PDF preview could not be loaded" : "Preview could not be loaded"
+                                color: Theme.subtext
+                                font.pointSize: Theme.fontNormal
+                            }
+
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                visible: root.isPdf && root.pdfPreview.error !== ""
+                                textFormat: Text.PlainText
+                                text: root.pdfPreview.error
+                                color: Theme.muted
+                                font.pointSize: Theme.fontSmall
+                            }
+                        }
+
+                        Rectangle {
+                            anchors.centerIn: parent
+                            visible: (root.hasVisualPreview && visualPreview.status === Image.Loading)
+                                || (root.isPdf && root.pdfPreviewAvailable && root.pdfPreview.localPath !== "" && pdfPreviewImage.status === Image.Loading)
+                            color: Qt.rgba(Theme.base.r, Theme.base.g, Theme.base.b, 0.72)
+                            radius: Theme.radiusMedium
+                            width: 180
+                            height: 44
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: root.isPdf ? "Rendering PDF..." : root.visualStatusText
+                                color: Theme.text
+                                font.pointSize: Theme.fontNormal
+                            }
+                        }
+
+                        Flickable {
+                            id: textPreviewFlick
+                            anchors.fill: parent
+                            visible: root.isText && !root.isTable && !root.hasVisualPreview && !root.isPdf
+                            clip: true
+                            interactive: true
+                            boundsMovement: Flickable.StopAtBounds
+                            boundsBehavior: Flickable.StopAtBounds
+                            contentWidth: root.isMarkdown ? width : Math.max(width, textArea.implicitWidth)
+                            contentHeight: Math.max(height, textArea.implicitHeight)
+
+                            TextEdit {
+                                id: textArea
+                                readOnly: true
+                                selectByMouse: true
+                                width: root.isMarkdown ? textPreviewFlick.width : Math.max(implicitWidth, textPreviewFlick.width)
+                                baseUrl: root.markdownBaseUrl
+                                height: Math.max(implicitHeight, textPreviewFlick.height)
+                                textFormat: textPreview.usesBat && textPreview.html !== ""
+                                    ? TextEdit.RichText
+                                    : TextEdit.PlainText
+                                text: textPreview.error !== ""
+                                    ? textPreview.error
+                                    : (textPreview.isBinary
+                                        ? "This file looks binary and cannot be previewed as text."
+                                        : (textPreview.usesBat && textPreview.html !== ""
+                                            ? (root.isMarkdown
+                                                ? root.fitMarkdownImages(textPreview.html,
+                                                                         textPreviewFlick.width - 24)
+                                                : textPreview.html)
+                                            : textPreview.content))
+                                color: Theme.text
+                                wrapMode: root.isMarkdown ? TextEdit.WrapAtWordBoundaryOrAnywhere : TextEdit.NoWrap
+                                font.family: root.isMarkdown ? Qt.application.font.family : "monospace"
+                                font.pointSize: Theme.fontSmall
+
+                                onCursorRectangleChanged: {
+                                    var r = cursorRectangle
+                                    var pad = 4
+                                    if (r.x - pad < textPreviewFlick.contentX)
+                                        textPreviewFlick.contentX = Math.max(0, r.x - pad)
+                                    else if (r.x + r.width + pad > textPreviewFlick.contentX + textPreviewFlick.width)
+                                        textPreviewFlick.contentX = Math.min(
+                                            textPreviewFlick.contentWidth - textPreviewFlick.width,
+                                            r.x + r.width + pad - textPreviewFlick.width)
+                                    if (r.y - pad < textPreviewFlick.contentY)
+                                        textPreviewFlick.contentY = Math.max(0, r.y - pad)
+                                    else if (r.y + r.height + pad > textPreviewFlick.contentY + textPreviewFlick.height)
+                                        textPreviewFlick.contentY = Math.min(
+                                            textPreviewFlick.contentHeight - textPreviewFlick.height,
+                                            r.y + r.height + pad - textPreviewFlick.height)
+                                }
+                            }
+
+                            ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+                            ScrollBar.horizontal: ScrollBar { policy: ScrollBar.AsNeeded }
+                        }
+
+                        CsvTable {
+                            anchors.fill: parent
+                            visible: root.isText && root.isTable && !root.hasVisualPreview && !root.isPdf
+                            table: visible ? textPreview.table : ({})
+                        }
+
+                        KineticWheelScroller {
+                            anchors.fill: textPreviewFlick
+                            visible: textPreviewFlick.visible
+                            flickable: textPreviewFlick
+                            wheelStep: 28
+                            touchpadMultiplier: 1.35
+                            minVelocity: 90
+                            maxVelocity: 2600
+                            kineticGain: 0.68
+                        }
+
+                        Text {
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            anchors.bottomMargin: 8
+                            visible: root.isText && !root.isTable && textPreview.error === "" && !textPreview.isBinary && !textPreview.usesBat && !root.textHighlightAvailable
+                            text: runtimeFeatures.installHint("textHighlight")
+                            color: Theme.subtext
+                            font.pointSize: Theme.fontSmall
+                            wrapMode: Text.WordWrap
+                            horizontalAlignment: Text.AlignHCenter
+                        }
+
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            spacing: 12
+                            visible: root.isDirectory || root.isArchive
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: root.isArchive ? "Archive contents" : (fileProps.contentText || "Folder contents")
+                                color: Theme.text
+                                font.pointSize: Theme.fontNormal
+                                font.bold: true
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+                                visible: directoryPreview.error !== ""
+                                textFormat: Text.PlainText
+                                text: directoryPreview.error
+                                color: Theme.error
+                                font.pointSize: Theme.fontNormal
+                                wrapMode: Text.WordWrap
+                            }
+
+                            Rectangle {
+                                Layout.alignment: Qt.AlignHCenter
+                                visible: directoryPreview.requiresPassword === true
+                                implicitWidth: unlockMouse.containsMouse ? 132 : 124
+                                implicitHeight: 32
+                                radius: Theme.radiusMedium
+                                color: unlockMouse.containsMouse
+                                    ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.25)
+                                    : Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.14)
+                                Behavior on implicitWidth { NumberAnimation { duration: 100 } }
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "Enter password"
+                                    color: Theme.text
+                                    font.pointSize: Theme.fontSmall
+                                }
+
+                                MouseArea {
+                                    id: unlockMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    onClicked: root.unlockArchiveRequested(root.filePath, false)
+                                }
+                            }
+
+                            Item {
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                visible: directoryPreview.error === ""
+
+                                ListView {
+                                    id: directoryPreviewList
+                                    anchors.fill: parent
+                                    model: directoryPreview.entries || []
+                                    clip: true
+                                    spacing: 4
+
+                                    delegate: Text {
+                                        width: ListView.view.width
+                                        text: modelData
+                                        color: Theme.text
+                                        font.pointSize: Theme.fontNormal
+                                        elide: Text.ElideMiddle
+                                    }
+
+                                    ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+                                }
+
+                                KineticWheelScroller {
+                                    anchors.fill: parent
+                                    flickable: directoryPreviewList
+                                    wheelStep: 28
+                                    touchpadMultiplier: 1.35
+                                    minVelocity: 90
+                                    maxVelocity: 2600
+                                    kineticGain: 0.68
+                                }
+                            }
+                        }
+
+                        Column {
+                            anchors.centerIn: parent
+                            spacing: 12
+                            visible: root.isPdf && (!root.pdfPreviewAvailable || pdfPreview.error !== "")
+
+                            Image {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                width: 96
+                                height: 96
+                                source: "image://icon/" + (root.fileProps.iconName || "application-pdf") + "?theme=" + config.iconTheme
+                                sourceSize: Qt.size(width, height)
+                                fillMode: Image.PreserveAspectFit
+                            }
+
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: root.pdfPreviewAvailable ? "PDF preview is unavailable for this file" : "PDF preview support is unavailable"
+                                color: Theme.text
+                                font.pointSize: Theme.fontNormal
+                                width: 280
+                                wrapMode: Text.WordWrap
+                                horizontalAlignment: Text.AlignHCenter
+                            }
+
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                textFormat: Text.PlainText
+                                text: root.pdfPreview.error !== ""
+                                    ? root.pdfPreview.error
+                                    : (root.pdfPreviewAvailable
+                                        ? "Press Enter to open the file externally"
+                                        : runtimeFeatures.installHint("pdfPreview"))
+                                color: Theme.subtext
+                                font.pointSize: Theme.fontSmall
+                                wrapMode: Text.WordWrap
+                                width: 240
+                                horizontalAlignment: Text.AlignHCenter
+                            }
+                        }
+
+                        Flickable {
+                            id: fontPreviewFlick
+                            anchors.fill: parent
+                            anchors.margins: 12
+                            visible: root.isFont
+                            clip: true
+                            boundsBehavior: Flickable.StopAtBounds
+                            contentWidth: width
+                            contentHeight: fontPreviewColumn.implicitHeight
+
+                            ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+
+                            Column {
+                                id: fontPreviewColumn
+                                width: fontPreviewFlick.width
+                                spacing: 14
+
+                                Text {
+                                    width: parent.width
+                                    visible: !root.fontPreview.valid
+                                    textFormat: Text.PlainText
+                                    text: root.fontPreview.error || "Unable to load this font"
+                                    color: Theme.error
+                                    font.pointSize: Theme.fontNormal
+                                }
+
+                                Text {
+                                    width: parent.width
+                                    visible: root.fontPreview.valid
+                                    text: root.fontPreview.styleName && root.fontPreview.styleName !== ""
+                                        ? (root.fontPreview.family + " — " + root.fontPreview.styleName)
+                                        : (root.fontPreview.family || "")
+                                    color: Theme.subtext
+                                    font.pointSize: Theme.fontSmall
+                                    font.weight: Font.DemiBold
+                                    elide: Text.ElideRight
+                                }
+
+                                Repeater {
+                                    model: root.fontPreview.valid ? [12, 18, 24, 32, 48] : []
+                                    delegate: Text {
+                                        width: fontPreviewColumn.width
+                                        text: "The quick brown fox jumps over the lazy dog"
+                                        color: Theme.text
+                                        font.family: root.fontPreview.family || ""
+                                        font.styleName: root.fontPreview.styleName || ""
+                                        font.weight: root.fontPreview.weight || Font.Normal
+                                        font.italic: root.fontPreview.italic || false
+                                        font.pointSize: modelData
+                                        wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+                                    }
+                                }
+
+                                Text {
+                                    width: parent.width
+                                    visible: root.fontPreview.valid
+                                    text: "ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n0123456789  !@#$%^&*()"
+                                    color: Theme.text
+                                    font.family: root.fontPreview.family || ""
+                                    font.styleName: root.fontPreview.styleName || ""
+                                    font.weight: root.fontPreview.weight || Font.Normal
+                                    font.italic: root.fontPreview.italic || false
+                                    font.pointSize: 20
+                                    wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+                                }
+
+                                Text {
+                                    width: parent.width
+                                    visible: root.fontPreview.valid
+                                    text: "Glyphs & ligatures"
+                                    color: Theme.subtext
+                                    font.pointSize: Theme.fontSmall
+                                    font.weight: Font.DemiBold
+                                    topPadding: 6
+                                }
+
+                                Repeater {
+                                    model: root.fontPreview.valid
+                                        ? [
+                                            "~!@#$%^&* {} [] () I1l O0o",
+                                            "!== \\\\ <= #{ -> ~@ |> 0x12",
+                                            "|=>==<==>=|======|===|===>",
+                                            "<---|--|--------|-<->--<-|",
+                                            "[INFO] todo)) fixme))"
+                                          ]
+                                        : []
+                                    delegate: Text {
+                                        width: fontPreviewColumn.width
+                                        text: modelData
+                                        color: Theme.text
+                                        font.family: root.fontPreview.family || ""
+                                        font.styleName: root.fontPreview.styleName || ""
+                                        font.weight: root.fontPreview.weight || Font.Normal
+                                        font.italic: root.fontPreview.italic || false
+                                        font.pointSize: 18
+                                        wrapMode: Text.NoWrap
+                                    }
+                                }
+                            }
+                        }
+
+                        Column {
+                            anchors.centerIn: parent
+                            spacing: 12
+                            visible: !root.hasVisualPreview && !root.isText && !root.isDirectory && !root.isArchive && !root.isPdf && !root.isFont
+
+                            Image {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                width: 96
+                                height: 96
+                                source: "image://icon/" + (root.fileProps.iconName || "text-x-generic") + "?theme=" + config.iconTheme
+                                sourceSize: Qt.size(width, height)
+                                fillMode: Image.PreserveAspectFit
+                            }
+
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: root.isAudio
+                                    ? "Audio preview is not available yet"
+                                    : (root.isVideo && !root.videoPreviewAvailable
+                                        ? "Video preview support is unavailable"
+                                        : "Preview not available")
+                                color: Theme.text
+                                font.pointSize: Theme.fontNormal
+                                width: 280
+                                wrapMode: Text.WordWrap
+                                horizontalAlignment: Text.AlignHCenter
+                            }
+
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: root.isVideo && !root.videoPreviewAvailable
+                                    ? runtimeFeatures.installHint("videoPreview")
+                                    : "Press Enter to open externally"
+                                color: Theme.subtext
+                                font.pointSize: Theme.fontSmall
+                                width: 280
+                                wrapMode: Text.WordWrap
+                                horizontalAlignment: Text.AlignHCenter
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    Layout.preferredWidth: 300
+                    Layout.minimumWidth: 280
+                    Layout.fillHeight: true
+                    radius: Theme.radiusMedium
+                    color: Qt.rgba(Theme.base.r, Theme.base.g, Theme.base.b, 0.7)
+                    border.width: 1
+                    border.color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.08)
+
+                    Flickable {
+                        id: sidebarFlick
+                        anchors.fill: parent
+                        anchors.margins: 12
+                        clip: true
+                        interactive: true
+                        boundsMovement: Flickable.StopAtBounds
+                        boundsBehavior: Flickable.StopAtBounds
+                        contentWidth: width
+                        contentHeight: sidebarColumn.implicitHeight
+
+                        Column {
+                            id: sidebarColumn
+                            width: sidebarFlick.width
+                            spacing: 12
+
+                            Image {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                width: 72
+                                height: 72
+                                source: "image://icon/" + (root.fileProps.iconName || "text-x-generic") + "?theme=" + config.iconTheme
+                                sourceSize: Qt.size(width, height)
+                                fillMode: Image.PreserveAspectFit
+                            }
+
+                            InfoBlock { label: "Kind"; value: root.detailKind; visibleWhenEmpty: true }
+                            InfoBlock { label: "Size"; value: fileProps.sizeText || "" }
+
+                            // Dynamic metadata from MetadataExtractor
+                            Repeater {
+                                model: {
+                                    var result = []
+                                    var md = root.fileMetadata || {}
+                                    var keys = Object.keys(md)
+                                    for (var i = 0; i < keys.length; ++i) {
+                                        if (md[keys[i]] !== "")
+                                            result.push({ label: keys[i], value: String(md[keys[i]]) })
+                                    }
+                                    return result
+                                }
+                                delegate: InfoBlock { label: modelData.label; value: modelData.value }
+                            }
+
+                            InfoBlock { label: root.fileProps.originalPath ? "Original Location" : "Location"; value: root.sidebarPathLabel }
+                            InfoBlock { label: "Deleted"; value: fileProps.deleted || "" }
+                            InfoBlock { label: "Modified"; value: fileProps.modified || "" }
+                            InfoBlock { label: "Contents"; value: fileProps.contentText || "" }
+
+                            // Missing dependency hint
+                            Text {
+                                width: parent.width
+                                visible: root.metadataHint !== ""
+                                text: root.metadataHint
+                                color: Theme.muted
+                                font.pointSize: Theme.fontSmall
+                                font.italic: true
+                                wrapMode: Text.WordWrap
+                                topPadding: 8
+                            }
+
+                            Text {
+                                width: parent.width
+                                visible: root.isText && textPreview.truncated
+                                text: "Showing a shortened text preview for quick browsing."
+                                color: Theme.subtext
+                                font.pointSize: Theme.fontSmall
+                                wrapMode: Text.WordWrap
+                            }
+
+                            Text {
+                                width: parent.width
+                                visible: (root.isDirectory || root.isArchive) && directoryPreview.truncated
+                                text: "Only the first items are shown here."
+                                color: Theme.subtext
+                                font.pointSize: Theme.fontSmall
+                                wrapMode: Text.WordWrap
+                            }
+                        }
+
+                        ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+                    }
+
+                    KineticWheelScroller {
+                        anchors.fill: sidebarFlick
+                        flickable: sidebarFlick
+                        wheelStep: 28
+                        touchpadMultiplier: 1.35
+                        minVelocity: 90
+                        maxVelocity: 2600
+                        kineticGain: 0.68
+                    }
+                }
+            }
+
+            Text {
+                Layout.fillWidth: true
+                text: root.directoryFiles.length > 1
+                    ? "Use Space or Esc to close, Return to open, and Left/Right to browse nearby items"
+                    : "Use Space or Esc to close, and Return to open externally"
+                color: Theme.muted
+                font.pointSize: Theme.fontSmall
+                horizontalAlignment: Text.AlignRight
+                wrapMode: Text.WordWrap
+            }
+        }
+    }
+}

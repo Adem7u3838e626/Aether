@@ -12,9 +12,8 @@ for style in FluentWinUI3 Fusion Imagine Material Universal; do
 done
 rm -rf "$appdir/usr/qml/QtQuick/Controls/designer"
 
-# No `import QtQuick.Dialogs` anywhere; Basic's dependency scan drags it in.
-rm -rf "$appdir/usr/qml/QtQuick/Dialogs"
-rm -f "$appdir"/usr/lib/libQt6QuickDialogs2*.so*
+# QtQuick.Dialogs is used by the AppImage installer to choose an icon and
+# destination folder, so keep its QML module and libraries in the AppImage.
 
 # Qt's own .qm files: Aether has no translations and never installs a QTranslator.
 rm -rf "$appdir/usr/translations"

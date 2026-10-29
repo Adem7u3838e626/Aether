@@ -37,7 +37,8 @@ public:
                  AuthorRole, EntryRole, EnabledRole, ErrorRole, ActionsRole, SettingsRole, PermissionsRole };
     Q_ENUM(Roles)
 
-    explicit PluginManager(FileOperations *fileOperations, QObject *parent = nullptr);
+    explicit PluginManager(FileOperations *fileOperations, const QString &configDirectory,
+                           QObject *parent = nullptr);
     ~PluginManager() override;
     int rowCount(const QModelIndex &parent = {}) const override;
     QVariant data(const QModelIndex &index, int role) const override;

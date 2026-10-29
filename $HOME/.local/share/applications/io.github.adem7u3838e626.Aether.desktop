@@ -1,0 +1,18 @@
+[Desktop Entry]
+Name=Aether
+GenericName=File Manager
+Comment=A lightweight Qt6/QML file manager for Hyprland
+Exec=aether %F
+Icon=io.github.adem7u3838e626.Aether
+Terminal=false
+Type=Application
+Categories=System;FileManager;Qt;
+MimeType=inode/directory;
+StartupNotify=true
+StartupWMClass=aether
+Keywords=files;explorer;manager;browser;filesystem;
+Actions=new-window;
+
+[Desktop Action new-window]
+Name=New Window
+Exec=aether --new-window

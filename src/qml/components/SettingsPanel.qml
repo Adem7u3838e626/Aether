@@ -160,6 +160,7 @@ Window {
     Component { id: layoutSectionIcon; IconPanelLeft {} }
     Component { id: motionSectionIcon; IconClock {} }
     Component { id: driveSectionIcon; IconCloud {} }
+    Component { id: devicesSectionIcon; IconHardDrive {} }
     Component { id: toolsSectionIcon; IconFolder {} }
     Component { id: pluginsSectionIcon; IconPackageOpen {} }
 
@@ -169,6 +170,7 @@ Window {
         { title: "Look & Feel", iconComponent: paletteSectionIcon },
         { title: "Layout", iconComponent: layoutSectionIcon },
         { title: "Motion", iconComponent: motionSectionIcon },
+        { title: "Devices", iconComponent: devicesSectionIcon },
         { title: "Drive", iconComponent: driveSectionIcon },
         { title: "Tools", iconComponent: toolsSectionIcon },
         { title: "Plugins", iconComponent: pluginsSectionIcon }
@@ -177,6 +179,7 @@ Window {
         { title: "Look & Feel", subtitle: "Theme, typography, icons, and surface styling.", iconComponent: paletteSectionIcon },
         { title: "Layout", subtitle: "Sidebar behavior, file visibility, and toolbar controls.", iconComponent: layoutSectionIcon },
         { title: "Motion", subtitle: "Animation timing and easing across the interface.", iconComponent: motionSectionIcon },
+        { title: "Devices", subtitle: "Manage removable storage, mounting, and display names.", iconComponent: devicesSectionIcon },
         { title: "Drive", subtitle: "Connect cloud storage and review configured drives.", iconComponent: driveSectionIcon },
         { title: "Tools", subtitle: "Shortcuts, remote locations, and config behavior.", iconComponent: toolsSectionIcon },
         { title: "Plugins", subtitle: "Optional extensions for Aether.", iconComponent: pluginsSectionIcon }
@@ -376,6 +379,7 @@ Window {
     }
 
     function openPanel() {
+        desktopIntegration.refresh()
         syncFromCurrentState()
         showSection(0)
         // Center over the parent window
@@ -1227,6 +1231,98 @@ Window {
     }
 
     Component {
+        id: devicesPageComponent
+
+        ColumnLayout {
+            width: pageLoader.width
+            spacing: 12
+
+            Text {
+                Layout.fillWidth: true
+                text: "Manage USB drives and other storage volumes connected to this computer. Names are saved in Aether."
+                color: Theme.subtext
+                font.pointSize: Theme.fontNormal
+                wrapMode: Text.WordWrap
+            }
+
+            Q.Toggle {
+                Layout.fillWidth: true
+                label: "Automatically mount removable drives when connected"
+                checked: devices.autoMountRemovable
+                onToggled: (value) => devices.autoMountRemovable = value
+            }
+
+            Text {
+                Layout.topMargin: 6
+                text: "Connected storage"
+                color: Theme.accent
+                font.pointSize: Theme.fontSmall
+                font.bold: true
+            }
+
+            Text {
+                visible: devices.count === 0
+                Layout.fillWidth: true
+                text: "No storage volumes found. Connect a USB drive to manage it here."
+                color: Theme.muted
+                font.pointSize: Theme.fontSmall
+            }
+
+            Repeater {
+                model: devices
+
+                delegate: Rectangle {
+                    required property int index
+                    required property string deviceName
+                    required property string devicePath
+                    required property string mountPoint
+                    required property bool mounted
+                    Layout.fillWidth: true
+                    implicitHeight: 74
+                    radius: Math.min(Theme.radiusSmall, 4)
+                    color: Theme.containerColor(Theme.surface, 0.45)
+                    border.width: 1
+                    border.color: root.sectionBorderColor
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.margins: 10
+                        spacing: 8
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 4
+                            Q.TextField {
+                                id: displayNameField
+                                Layout.fillWidth: true
+                                placeholder: "Volume name"
+                                text: deviceName
+                            }
+                            Text {
+                                Layout.fillWidth: true
+                                text: mounted ? mountPoint : devicePath
+                                color: Theme.muted
+                                font.pointSize: Theme.fontSmall
+                                elide: Text.ElideMiddle
+                            }
+                        }
+
+                        Q.Button {
+                            text: "Save name"
+                            variant: "ghost"
+                            onClicked: devices.rename(index, displayNameField.text)
+                        }
+                        Q.Button {
+                            text: mounted ? "Unmount" : "Mount"
+                            onClicked: mounted ? devices.unmount(index) : devices.mount(index)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Component {
         id: drivePageComponent
 
         ColumnLayout {
@@ -1357,6 +1453,64 @@ Window {
                 onToggled: (value) => {
                     root.draftDependencyStartupCheck = value
                     root.applySettingsNow()
+                }
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.topMargin: 8
+                implicitHeight: desktopDefaultsColumn.implicitHeight + 24
+                radius: Theme.radiusSmall
+                color: Theme.surface
+                border.color: root.sectionBorderColor
+
+                ColumnLayout {
+                    id: desktopDefaultsColumn
+                    anchors.fill: parent
+                    anchors.margins: 12
+                    spacing: 8
+
+                    Text {
+                        text: "Desktop defaults"
+                        color: Theme.text
+                        font.pointSize: Theme.fontSmall
+                        font.bold: true
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Text {
+                            Layout.fillWidth: true
+                            text: "Default file manager (opens folders)"
+                            color: Theme.subtext
+                            font.pointSize: Theme.fontSmall
+                        }
+                        Q.Button {
+                            text: desktopIntegration.defaultFileManager ? "Default" : "Make default"
+                            enabled: !desktopIntegration.defaultFileManager
+                            onClicked: desktopIntegration.makeDefaultFileManager()
+                        }
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Text {
+                            Layout.fillWidth: true
+                            text: "Default file picker (Open/Save dialogs)"
+                            color: Theme.subtext
+                            font.pointSize: Theme.fontSmall
+                        }
+                        Q.Button {
+                            text: desktopIntegration.defaultFilePicker ? "Default" : "Make default"
+                            enabled: !desktopIntegration.defaultFilePicker
+                            onClicked: desktopIntegration.makeDefaultFilePicker()
+                        }
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        text: desktopIntegration.statusMessage
+                        color: Theme.subtext
+                        font.pointSize: Theme.fontSmall
+                        wrapMode: Text.WordWrap
+                    }
                 }
             }
         }
@@ -1748,10 +1902,12 @@ Window {
                                             : root.currentSectionIndex === 2
                                                 ? motionPageComponent
                                                 : root.currentSectionIndex === 3
-                                                    ? drivePageComponent
+                                                    ? devicesPageComponent
                                                     : root.currentSectionIndex === 4
-                                                        ? toolsPageComponent
-                                                        : pluginsPageComponent
+                                                        ? drivePageComponent
+                                                        : root.currentSectionIndex === 5
+                                                            ? toolsPageComponent
+                                                            : pluginsPageComponent
                                 }
                             }
                         }

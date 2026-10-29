@@ -43,6 +43,12 @@ ApplicationWindow {
     property bool transferMoveOperation: false
     property bool transferClearClipboardOnSuccess: false
     property string transferDestinationPath: ""
+    property string portalRequestId: ""
+    property string portalMode: "open"
+    property var portalOptions: ({})
+    property var portalSelectedPaths: []
+    property string portalViewMode: "grid"
+    property bool portalPickerSidebarVisible: true
     property var transferReservedTargets: ({})
     property bool paneFocusScheduled: false
     // Archive being unlocked right now; {path, dest}. dest is empty when the
@@ -415,6 +421,11 @@ ApplicationWindow {
         cloudDriveDialogLoader.active = true
         root.cloudDriveDialog.resetForm()
         root.cloudDriveDialog.open()
+    }
+
+    function openInstallAppImageDialog(path) {
+        installAppImageDialogLoader.active = true
+        root.installAppImageDialog.openFor(path)
     }
 
     function showQuickPreview(path) {
@@ -1534,6 +1545,24 @@ ApplicationWindow {
         }
     }
     readonly property var cloudDriveDialog: cloudDriveDialogLoader.item
+
+    Loader {
+        id: installAppImageDialogLoader
+        objectName: "installAppImageDialogLoader"
+        anchors.fill: parent
+        z: 1000
+        active: false
+        sourceComponent: Component {
+            Components.InstallAppImageDialog {
+                objectName: "installAppImageDialog"
+                onInstallCompleted: (success, message) => {
+                    if (success)
+                        toast.show(message, "success")
+                }
+            }
+        }
+    }
+    readonly property var installAppImageDialog: installAppImageDialogLoader.item
 
     // Created the first time it opens: building it (and its dropdowns,
     // sliders and pages) at startup cost more than any other hidden piece of
@@ -3212,6 +3241,7 @@ ApplicationWindow {
                     root.appChooserDialog.mimeType = mimeType
                     root.appChooserDialog.open()
                 }
+                onInstallAppImageRequested: (path) => root.openInstallAppImageDialog(path)
 
                 onCustomActionRunRequested: (name, command, paths) => {
                     root.runCustomActionOnPaths(name, command, paths)
@@ -4800,6 +4830,265 @@ ApplicationWindow {
                     : "Cloud drive removed", "success")
             } else {
                 toast.show(errorString || "Cloud drive action failed", "error")
+            }
+        }
+    }
+
+    Connections {
+        target: desktopIntegration
+        function onPickerRequested(requestId, pickerTitle, options, mode) {
+            if (!desktopIntegration.claimPicker(requestId)) return
+            root.portalRequestId = requestId
+            root.portalMode = mode
+            root.portalOptions = options
+            root.portalSelectedPaths = []
+            root.portalPickerSidebarVisible = true
+            root.portalViewMode = tabModel.activeTab ? tabModel.activeTab.viewMode : "grid"
+            var pickerView = portalPickerFileView.activeView()
+            if (pickerView && pickerView.clearSelection)
+                pickerView.clearSelection()
+            portalSaveName.text = options.current_name || ""
+            var folder = options.initial_folder ? String(options.initial_folder) : ""
+            if (!folder.startsWith("/")) folder = portalFsModel.homePath()
+            portalFsModel.setRootPath(folder)
+            portalPickerWindow.responseSent = false
+            portalPickerWindow.title = pickerTitle || (mode === "save" ? "Save File" : "Open File")
+            portalPickerWindow.show()
+            portalPickerWindow.raise()
+            portalPickerWindow.requestActivate()
+        }
+    }
+
+    function refreshPortalPickerSelection() {
+        var view = portalPickerFileView.activeView()
+        var indices = view && view.selectedIndices ? view.selectedIndices : []
+        var selected = []
+        for (var i = 0; i < indices.length; ++i)
+            selected.push(portalFsModel.filePath(indices[i]))
+        if (!root.portalOptions.multiple && selected.length > 1)
+            selected = [selected[selected.length - 1]]
+        root.portalSelectedPaths = selected
+    }
+
+    Window {
+        id: portalPickerWindow
+        width: 940
+        height: 650
+        minimumWidth: 680
+        minimumHeight: 460
+        visible: false
+        color: "transparent"
+        flags: Qt.platform.os === "linux" && runtimeFeatures.useIntegratedWindowControls
+            ? (Qt.Dialog | Qt.FramelessWindowHint) : Qt.Dialog
+        modality: Qt.ApplicationModal
+        transientParent: root
+        property bool responseSent: false
+
+        function finish(accepted) {
+            var paths = []
+            if (!accepted) {
+                desktopIntegration.completePicker(root.portalRequestId, [], false)
+                root.portalRequestId = ""
+                responseSent = true
+                close()
+                return
+            }
+            if (root.portalMode === "directory" || root.portalMode === "save-files") {
+                paths.push(portalFsModel.rootPath)
+            } else if (root.portalMode === "save") {
+                if (portalSaveName.text.trim() !== "")
+                    paths.push(portalFsModel.rootPath + "/" + portalSaveName.text.trim())
+            } else {
+                paths = root.portalSelectedPaths.slice(0)
+            }
+            desktopIntegration.completePicker(root.portalRequestId, paths, paths.length > 0)
+            root.portalRequestId = ""
+            responseSent = true
+            close()
+        }
+
+        onClosing: function(closeEvent) {
+            if (!responseSent) {
+                desktopIntegration.completePicker(root.portalRequestId, [], false)
+                root.portalRequestId = ""
+                responseSent = true
+            }
+            closeEvent.accepted = true
+        }
+
+        RowLayout {
+            anchors.fill: parent
+            spacing: 0
+            LayoutMirroring.enabled: config.sidebarPosition === "right"
+            LayoutMirroring.childrenInherit: false
+
+            Sidebar {
+                id: portalPickerSidebar
+                visible: root.portalPickerSidebarVisible
+                Layout.preferredWidth: visible ? config.sidebarWidth : 0
+                Layout.fillHeight: true
+                currentPath: portalFsModel.rootPath
+                isRecentsView: false
+                onBookmarkClicked: (path) => portalFsModel.setRootPath(path)
+                onSavedSplitClicked: (split) => portalFsModel.setRootPath(split.primaryPath || portalFsModel.homePath())
+                onRecentsClicked: portalFsModel.setRootPath(portalFsModel.homePath())
+                onCollapseClicked: root.portalPickerSidebarVisible = false
+                onReturnToFilesRequested: portalPickerFileView.forceActiveFocus()
+            }
+
+            Item {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    spacing: 0
+
+                    Toolbar {
+                        id: portalPickerToolbar
+                        Layout.fillWidth: true
+                        pickerMode: true
+                        window: portalPickerWindow
+                        navigationPath: portalFsModel.rootPath
+                        canGoBack: false
+                        canGoForward: false
+                        activeTab: null
+                        splitViewEnabled: false
+                        isRecentsView: false
+                        isTrashView: false
+                        isRemoteView: false
+                        searchMode: false
+                        sidebarVisible: root.portalPickerSidebarVisible
+                        sidebarOnRight: config.sidebarPosition === "right"
+                        showWindowControls: Qt.platform.os === "linux" && config.showWindowControls
+                        windowButtonLayout: config.windowButtonLayout
+                        currentViewMode: root.portalViewMode
+                        onBackRequested: {}
+                        onForwardRequested: {}
+                        onUpRequested: portalFsModel.setRootPath(portalFsModel.rootPath.replace(/\/?[^/]+\/?$/, "") || "/")
+                        onNavigateRequested: (path) => portalFsModel.setRootPath(path)
+                        onHomeClicked: portalFsModel.setRootPath(portalFsModel.homePath())
+                        onSidebarToggleRequested: root.portalPickerSidebarVisible = !root.portalPickerSidebarVisible
+                        onViewModeRequested: (mode) => root.portalViewMode = mode
+                        onCloseRequested: portalPickerWindow.finish(false)
+                        onMinimizeRequested: portalPickerWindow.showMinimized()
+                        onMaximizeRequested: portalPickerWindow.visibility === Window.Maximized
+                            ? portalPickerWindow.showNormal() : portalPickerWindow.showMaximized()
+                    }
+
+                    Rectangle {
+                        id: portalContentArea
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        color: Theme.containerColor(Theme.base, 0.65)
+
+                        Shape {
+                            z: 1
+                            width: Theme.radiusMedium
+                            height: Theme.radiusMedium
+                            anchors.top: parent.top
+                            anchors.left: parent.left
+                            ShapePath {
+                                fillColor: Theme.mantle
+                                strokeColor: "transparent"
+                                startX: 0; startY: 0
+                                PathLine { x: Theme.radiusMedium; y: 0 }
+                                PathArc {
+                                    x: 0; y: Theme.radiusMedium
+                                    radiusX: Theme.radiusMedium; radiusY: Theme.radiusMedium
+                                    direction: PathArc.Counterclockwise
+                                }
+                                PathLine { x: 0; y: 0 }
+                            }
+                        }
+                        Shape {
+                            z: 1
+                            width: Theme.radiusMedium
+                            height: Theme.radiusMedium
+                            anchors.top: parent.top
+                            anchors.right: parent.right
+                            ShapePath {
+                                fillColor: Theme.mantle
+                                strokeColor: "transparent"
+                                startX: Theme.radiusMedium; startY: 0
+                                PathLine { x: 0; y: 0 }
+                                PathArc {
+                                    x: Theme.radiusMedium; y: Theme.radiusMedium
+                                    radiusX: Theme.radiusMedium; radiusY: Theme.radiusMedium
+                                    direction: PathArc.Clockwise
+                                }
+                                PathLine { x: Theme.radiusMedium; y: 0 }
+                            }
+                        }
+
+                        Rectangle {
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            radius: Theme.radiusMedium
+                            clip: true
+                            color: Theme.containerColor(Theme.crust, 0.14)
+                            border.color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.08)
+
+                            FileViewContainer {
+                                id: portalPickerFileView
+                                anchors.fill: parent
+                                fileModel: portalFsModel
+                                currentPath: portalFsModel.rootPath
+                                viewMode: root.portalViewMode
+                                onSelectionChanged: root.refreshPortalPickerSelection()
+                                onFileActivated: (filePath, isDirectory) => {
+                                    if (isDirectory) {
+                                        portalFsModel.setRootPath(filePath)
+                                        root.portalSelectedPaths = []
+                                    } else if (root.portalMode === "open") {
+                                        portalPickerWindow.finish(true)
+                                    }
+                                }
+                            }
+                        }
+
+                        RowLayout {
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            anchors.rightMargin: 20
+                            anchors.bottomMargin: 20
+                            spacing: 8
+                            z: 20
+
+                            Q.Button {
+                                text: root.portalMode === "save" ? "Save" : "Open"
+                                enabled: root.portalMode === "directory" || root.portalMode === "save-files"
+                                    || (root.portalMode === "save" && portalSaveName.text.trim() !== "")
+                                    || root.portalSelectedPaths.length > 0
+                                onClicked: portalPickerWindow.finish(true)
+                            }
+                            Q.Button {
+                                text: "Cancel"
+                                variant: "ghost"
+                                onClicked: portalPickerWindow.finish(false)
+                            }
+                        }
+                    }
+
+                    Q.TextField {
+                        id: portalSaveName
+                        Layout.fillWidth: true
+                        visible: root.portalMode === "save"
+                        placeholder: "File name"
+                        variant: "filled"
+                        onSubmitted: (name) => portalPickerWindow.finish(true)
+                    }
+
+                    StatusBar {
+                        Layout.fillWidth: true
+                        itemCount: portalFsModel.fileCount
+                        folderCount: portalFsModel.folderCount
+                        selectedCount: root.portalSelectedPaths.length
+                        diskFree: portalFsModel.diskFree
+                        diskTotal: portalFsModel.diskTotal
+                        isLoading: portalFsModel.isLoading
+                    }
+                }
             }
         }
     }

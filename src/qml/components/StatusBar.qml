@@ -94,7 +94,6 @@ Rectangle {
         anchors.fill: parent
         anchors.leftMargin: Theme.spacing
         anchors.rightMargin: Theme.spacing
-
         RowLayout {
             Layout.fillWidth: true
             visible: statusBar.showLoading

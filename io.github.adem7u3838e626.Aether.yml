@@ -2,10 +2,10 @@
 #
 # Local build (run from repo root after committing your changes):
 #
-#   flatpak install -y flathub org.kde.Platform//6.9 org.kde.Sdk//6.9
-#   flatpak-builder --force-clean --user --install \
-#       build-flatpak io.github.adem7u3838e626.Aether.yml
-#   flatpak run io.github.adem7u3838e626.Aether
+#   flatpak install -y flathub org.kde.Platform//6.11 org.kde.Sdk//6.11
+#   ./scripts/build-run-flatpak.sh
+#
+# To pass arguments to Aether, append them to the script invocation.
 #
 # For local iteration without committing, swap the `aether` module's source
 # from `type: git` to `type: dir, path: .` (see comment below).
@@ -15,7 +15,7 @@
 
 app-id: io.github.adem7u3838e626.Aether
 runtime: org.kde.Platform
-runtime-version: '6.9'
+runtime-version: '6.11'
 sdk: org.kde.Sdk
 command: aether
 
@@ -61,6 +61,34 @@ cleanup:
   - '*.la'
 
 modules:
+  # ── Lua 5.4 ──────────────────────────────────────────────────────────
+  # PluginManager embeds Lua scripts and the KDE runtime does not provide
+  # the lua5.4 pkg-config module required by the application.
+  - name: lua
+    buildsystem: simple
+    build-commands:
+      - make linux
+      - make install INSTALL_TOP=/app INSTALL_MAN=/app/share/man/man1
+      # Lua's upstream Makefile does not install a pkg-config file.
+      - install -d /app/lib/pkgconfig
+      - |
+        cat > /app/lib/pkgconfig/lua5.4.pc <<'EOF'
+        prefix=/app
+        exec_prefix=${prefix}
+        libdir=${prefix}/lib
+        includedir=${prefix}/include
+
+        Name: Lua
+        Description: Lua language library
+        Version: 5.4.8
+        Libs: -L${libdir} -llua -lm -ldl
+        Cflags: -I${includedir}
+        EOF
+    sources:
+      - type: archive
+        url: https://www.lua.org/ftp/lua-5.4.8.tar.gz
+        sha256: 4f18ddae154e793e46eeab727c59ef1c0c0c2b744e7b94219710d76f530629ae
+
   # ── wl-clipboard ───────────────────────────────────────────────────────
   # ClipboardManager spawns wl-copy / wl-paste. Bundle them so the
   # clipboard works without depending on host tools.
@@ -81,51 +109,6 @@ modules:
         url: https://github.com/bugaevc/wl-clipboard.git
         tag: v2.2.1
         commit: 3eb912c274042cd5deed6b478b39908a12f37498
-
-  # ── fd ─────────────────────────────────────────────────────────────────
-  # Search backend. Optional — SearchService falls back to a Qt iterator
-  # if `fd` / `fdfind` is not on PATH — but bundling it makes search fast.
-  # We use the upstream prebuilt x86_64 static binary to avoid pulling in
-  # the full Rust toolchain. (Note: Flathub generally prefers building
-  # from source; if reviewers push back, switch to the rust-stable SDK
-  # extension and build fd from its git tag.)
-  - name: fd
-    buildsystem: simple
-    build-commands:
-      - install -Dm755 fd /app/bin/fd
-    sources:
-      - type: archive
-        only-arches:
-          - x86_64
-        url: https://github.com/sharkdp/fd/releases/download/v10.2.0/fd-v10.2.0-x86_64-unknown-linux-musl.tar.gz
-        sha256: d9bfa25ec28624545c222992e1b00673b7c9ca5eb15393c40369f10b28f9c932
-      - type: archive
-        only-arches:
-          - aarch64
-        url: https://github.com/sharkdp/fd/releases/download/v10.2.0/fd-v10.2.0-aarch64-unknown-linux-gnu.tar.gz
-        sha256: 6de8be7a3d8ca27954a6d1e22bc327af4cf6fc7622791e68b820197f915c422b
-        # Same note as above — replace with the real checksum.
-
-  # ── bat ────────────────────────────────────────────────────────────────
-  # Optional syntax-highlighted text previews. Same prebuilt-binary
-  # approach as fd to avoid pulling in the Rust toolchain.
-  - name: bat
-    buildsystem: simple
-    build-commands:
-      - install -Dm755 bat /app/bin/bat
-    sources:
-      - type: archive
-        only-arches:
-          - x86_64
-        url: https://github.com/sharkdp/bat/releases/download/v0.24.0/bat-v0.24.0-x86_64-unknown-linux-musl.tar.gz
-        sha256: d39a21e3da57fe6a3e07184b3c1dc245f8dba379af569d3668b6dcdfe75e3052
-        # placeholder — flatpak-builder will print the real checksum on
-        # the first run; paste it back in here.
-      - type: archive
-        only-arches:
-          - aarch64
-        url: https://github.com/sharkdp/bat/releases/download/v0.24.0/bat-v0.24.0-aarch64-unknown-linux-gnu.tar.gz
-        sha256: feccae9a0576d97609c57e32d3914c5116136eab0df74c2ab74ef397d42c5b10
 
   # ── Aether ─────────────────────────────────────────────────────────────
   # ── poppler-utils ──────────────────────────────────────────────────────
@@ -206,6 +189,9 @@ modules:
         url: https://github.com/mity/md4c/archive/refs/tags/release-0.5.3.tar.gz
         sha256: 353c346f376b87c954a13f3415ede2d51264cc61dc5abcd38ff1d2aa0d059b9e
 
+  # fd and bat are optional. The app falls back to its Qt search iterator
+  # and plain text previews when these tools are unavailable. They are not
+  # included here so the submission does not redistribute prebuilt binaries.
   - name: aether
     buildsystem: cmake-ninja
     config-opts:
@@ -223,7 +209,7 @@ modules:
       # ── FLATHUB SUBMISSION ──
       - type: git
         url: https://github.com/Adem7u3838e626/Aether.git
-        tag: v0.6.1
+        commit: 2adac1795e3a6c0630daa8aaa8c6078621d2486e
 
       # ── LOCAL ITERATION ──
       # For testing uncommitted changes locally, comment out the git

@@ -1,0 +1,13 @@
+[colors]
+base = "#fbf1c7"
+mantle = "#f2e5bc"
+crust = "#ebdbb2"
+surface = "#f2e5bc"
+overlay = "#d5c4a1"
+text = "#3c3836"
+subtext = "#504945"
+muted = "#7c6f64"
+accent = "#af3a03"
+success = "#79740e"
+warning = "#b57614"
+error = "#9d0006"

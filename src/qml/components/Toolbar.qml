@@ -12,6 +12,7 @@ Rectangle {
     property bool canGoBack: false
     property bool canGoForward: false
     property bool splitViewEnabled: false
+    property bool pickerMode: false
     property bool isSplitHorizontal: false
     property bool isRecentsView: false
     property bool isTrashView: false
@@ -334,7 +335,7 @@ Rectangle {
 
                 HoverRect {
                     width: Theme.controlSize; height: Theme.controlSize
-                    visible: !root.searchMode
+                    visible: !root.searchMode && !root.pickerMode
                     border.width: root.splitViewEnabled ? 1 : 0
                     border.color: root.splitViewEnabled
                         ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.65)
@@ -399,21 +400,21 @@ Rectangle {
 
                 HoverRect {
                     width: Theme.controlSize; height: Theme.controlSize
-                    visible: !root.searchMode && !root.isTrashView && !root.isRemoteView
+                    visible: !root.pickerMode && !root.searchMode && !root.isTrashView && !root.isRemoteView
                     onClicked: root.searchClicked()
                     IconSearch { anchors.centerIn: parent; size: 18; color: Theme.text }
                 }
 
                 HoverRect {
                     width: Theme.controlSize; height: Theme.controlSize
-                    visible: !root.searchMode
+                    visible: !root.searchMode && !root.pickerMode
                     onClicked: root.keyboardShortcutsRequested()
                     IconKeyboard { anchors.centerIn: parent; size: 18; color: Theme.text }
                 }
 
                 HoverRect {
                     width: Theme.controlSize; height: Theme.controlSize
-                    visible: !root.searchMode
+                    visible: !root.searchMode && !root.pickerMode
                     onClicked: root.settingsRequested()
                     IconSettings { anchors.centerIn: parent; size: 18; color: Theme.text }
                 }
@@ -476,7 +477,7 @@ Rectangle {
         Item {
             id: tabBarRow
             Layout.fillWidth: true
-            Layout.preferredHeight: tabModel.count > 1 ? Math.round(36 * Theme.uiScale) : 0
+            Layout.preferredHeight: !root.pickerMode && tabModel.count > 1 ? Math.round(36 * Theme.uiScale) : 0
             visible: Layout.preferredHeight > 0 || tabBarHeightAnim.running
             clip: true
 

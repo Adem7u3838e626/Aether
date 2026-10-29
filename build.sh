@@ -6,14 +6,19 @@ cd "$(dirname "$(readlink -f "$0")")"
 # Keep the desktop shell's QML modules out of Aether's Qt import scan.
 unset QML_IMPORT_PATH QML2_IMPORT_PATH
 
-# Run this fork as a separate app with its own settings, even when it is
-# launched by this script after a rebuild.
-export AETHER_CONFIG_DIR="${AETHER_CONFIG_DIR:-${HOME}/.config/Aether}"
+# Run this fork as a separate app with its own settings and instance socket.
+export AETHER_CONFIG_DIR="${AETHER_CONFIG_DIR:-${HOME}/.config/Aether-dev}"
 
 cmake -B build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DBUILD_TESTS=OFF
 cmake --build build --parallel
+
+# Stage the install tree alongside the development build. This keeps the
+# XDG FileChooser portal descriptor and its D-Bus activation service in the
+# generated package output without replacing a system or ~/.local install.
+aether_stage_dir="$(pwd)/build/package"
+cmake --install build --prefix "$aether_stage_dir"
 
 wayland_socket="${WAYLAND_DISPLAY:-}"
 if [[ -n "$wayland_socket" && "$wayland_socket" != /* ]]; then
