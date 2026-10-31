@@ -1116,6 +1116,8 @@ int main(int argc, char *argv[])
         portalFsModel->setShowHidden(config->showHidden());
         portalFsModel->setHiddenLast(config->hiddenLast());
         portalFsModel->setRootPath(QDir::homePath());
+        auto *portalSearchProxy = new SearchProxyModel(w);
+        portalSearchProxy->setSourceModel(portalFsModel);
         auto *splitFsModel = new FileSystemModel(w);
         splitFsModel->setShowHidden(config->showHidden());
         splitFsModel->setHiddenLast(config->hiddenLast());
@@ -1159,6 +1161,7 @@ int main(int argc, char *argv[])
         context->setContextProperty("sessionState", w->sessionState);
         context->setContextProperty("fsModel", fsModel);
         context->setContextProperty("portalFsModel", portalFsModel);
+        context->setContextProperty("portalSearchProxy", portalSearchProxy);
         context->setContextProperty("splitFsModel", splitFsModel);
         context->setContextProperty("millerParentModel", millerParentModel);
         context->setContextProperty("millerPreviewModel", millerPreviewModel);

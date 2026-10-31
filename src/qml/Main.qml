@@ -4844,6 +4844,8 @@ ApplicationWindow {
             root.portalSelectedPaths = []
             root.portalPickerSidebarVisible = true
             root.portalViewMode = tabModel.activeTab ? tabModel.activeTab.viewMode : "grid"
+            portalSearchProxy.clearSearch()
+            portalFilterField.text = ""
             var pickerView = portalPickerFileView.activeView()
             if (pickerView && pickerView.clearSelection)
                 pickerView.clearSelection()
@@ -4864,7 +4866,7 @@ ApplicationWindow {
         var indices = view && view.selectedIndices ? view.selectedIndices : []
         var selected = []
         for (var i = 0; i < indices.length; ++i)
-            selected.push(portalFsModel.filePath(indices[i]))
+            selected.push(portalSearchProxy.filePath(indices[i]))
         if (!root.portalOptions.multiple && selected.length > 1)
             selected = [selected[selected.length - 1]]
         root.portalSelectedPaths = selected
@@ -4976,6 +4978,18 @@ ApplicationWindow {
                             ? portalPickerWindow.showNormal() : portalPickerWindow.showMaximized()
                     }
 
+                    Q.TextField {
+                        id: portalFilterField
+                        Layout.fillWidth: true
+                        Layout.leftMargin: Theme.spacing
+                        Layout.rightMargin: Theme.spacing
+                        Layout.topMargin: 4
+                        Layout.bottomMargin: 4
+                        placeholder: "Filter this folder by name"
+                        icon: "\uf002"
+                        onTextEdited: (query) => portalSearchProxy.searchQuery = query
+                    }
+
                     Rectangle {
                         id: portalContentArea
                         Layout.fillWidth: true
@@ -5032,7 +5046,7 @@ ApplicationWindow {
                             FileViewContainer {
                                 id: portalPickerFileView
                                 anchors.fill: parent
-                                fileModel: portalFsModel
+                                fileModel: portalSearchProxy
                                 currentPath: portalFsModel.rootPath
                                 viewMode: root.portalViewMode
                                 onSelectionChanged: root.refreshPortalPickerSelection()
@@ -5081,7 +5095,7 @@ ApplicationWindow {
 
                     StatusBar {
                         Layout.fillWidth: true
-                        itemCount: portalFsModel.fileCount
+                        itemCount: portalSearchProxy.count
                         folderCount: portalFsModel.folderCount
                         selectedCount: root.portalSelectedPaths.length
                         diskFree: portalFsModel.diskFree
