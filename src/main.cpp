@@ -723,13 +723,23 @@ int main(int argc, char *argv[])
     // 0700 fallback), which only this user can write to. It used to be
     // /tmp/Aether-<uid>: any local user could create that first, and every
     // launch would then hand its path to their server and quit.
-    QString socketFileName = QStringLiteral("Aether.sock");
-    if (configDir != QDir::cleanPath(defaultConfigDir)) {
-        const QByteArray profileHash = QCryptographicHash::hash(
-            configDir.toUtf8(), QCryptographicHash::Sha1).toHex().left(12);
-        socketFileName = QStringLiteral("Aether-") + QString::fromLatin1(profileHash)
-            + QStringLiteral(".sock");
-    }
+    // Keep old AppImage/system builds from receiving launches after another
+    // build has been installed. They still share the same user config, but
+    // each executable file gets its own handoff socket. For AppImages use the
+    // stable outer bundle path rather than the temporary mount path of the
+    // embedded executable.
+    const QString appImagePath = qEnvironmentVariable("APPIMAGE");
+    const QFileInfo executableInfo(appImagePath.isEmpty()
+        ? QCoreApplication::applicationFilePath() : appImagePath);
+    const QString executableIdentity = executableInfo.canonicalFilePath()
+        + QLatin1Char('\n') + QString::number(executableInfo.size())
+        + QLatin1Char('\n')
+        + QString::number(executableInfo.lastModified().toMSecsSinceEpoch());
+    const QByteArray instanceHash = QCryptographicHash::hash(
+        (configDir + QLatin1Char('\n') + executableIdentity).toUtf8(),
+        QCryptographicHash::Sha1).toHex().left(12);
+    const QString socketFileName = QStringLiteral("Aether-")
+        + QString::fromLatin1(instanceHash) + QStringLiteral(".sock");
     const QString aetherSocketName = QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation)
         + QLatin1Char('/') + socketFileName;
     QLocalServer *ipcServer = nullptr;

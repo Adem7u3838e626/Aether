@@ -237,16 +237,39 @@ connect to. On a non-NixOS host the distro's own gvfs covers this.
 
 ### Build from source
 
+#### System install/update
+
+From this checkout, build and install the current source system-wide with:
+
+```bash
+./build-system.sh
+```
+
+The script builds in Release mode, installs the executable and application
+resources under `/usr`, and refreshes the application-menu and Desktop
+shortcuts. It also points `~/.local/bin/aether` at `/usr/bin/aether` so the
+system build is used when `~/.local/bin` comes first in `PATH`; any previous
+user-local executable is kept as a timestamped backup. User settings stay in
+the normal `~/.config/Aether` directory. Quit any running Aether or AppImage
+before reopening the updated system build.
+
+The root `build.sh` is for development. It builds and launches
+`build/src/aether`, uses separate settings in `~/.config/Aether-dev`, and does
+not update the system installation.
+
+#### User-local install
+
+To install into `~/.local` instead of the system, use:
+
 ```bash
 git clone --recursive https://github.com/Adem7u3838e626/Aether.git aether
 cd aether
 cmake -B build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DBUILD_TESTS=OFF
-cmake --install build --prefix "$HOME/.local"
 cmake --build build --parallel
+cmake --install build --prefix "$HOME/.local"
 ```
-
 
 The installed launcher entry is named Aether; the terminal command is
 `aether`. Make sure `$HOME/.local/bin` is on your `PATH` to run it by name.
